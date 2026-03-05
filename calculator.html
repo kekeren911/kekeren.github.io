@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级科学计算器</title>
+    <style>
+        :root {
+            /* 浅色主题 */
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-display: #e8e8e8;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #cccccc;
+            --btn-bg: #ffffff;
+            --btn-hover: #e0e0e0;
+            --btn-active: #cccccc;
+            --btn-operator: #ff9500;
+            --btn-operator-hover: #e08400;
+            --btn-function: #505050;
+            --btn-function-hover: #606060;
+            --btn-text-light: #ffffff;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --display-bg: #222222;
+            --display-text: #00ff00;
+            --history-border: #ddd;
+        }
+
+        [data-theme="dark"] {
+            /* 深色主题 */
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2a2a2a;
+            --bg-display: #333333;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --border-color: #444444;
+            --btn-bg: #3a3a3a;
+            --btn-hover: #4a4a4a;
+            --btn-active: #5a5a5a;
+            --btn-operator: #ff9500;
+            --btn-operator-hover: #e08400;
+            --btn-function: #555555;
+            --btn-function-hover: #666666;
+            --shadow: 0 2px 10px rgba(0,0,0,0.3);
+            --display-bg: #111111;
+            --display-text: #00ff00;
+            --history-border: #444;
+        }
+
+        [data-theme="retro"] {
+            /* 复古主题 */
+            --bg-primary: #c4a574;
+            --bg-secondary: #d4b584;
+            --bg-display: #8b7355;
+            --text-primary: #2c1810;
+            --text-secondary: #5c4840;
+            --border-color: #a08050;
+            --btn-bg: #f0e0c0;
+            --btn-hover: #e0d0b0;
+            --btn-active: #d0c0a0;
+            --btn-operator: #8b4513;
+            --btn-operator-hover: #6b3503;
+            --btn-function: #a08050;
+            --btn-function-hover: #b09060;
+            --shadow: 0 4px 15px rgba(0,0,0,0.2);
+            --display-bg: #2c1810;
+            --display-text: #00ff00;
+            --history-border: #a08050;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 主题选择器 */
+        .theme-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+
+        .theme-btn {
+            padding: 10px 20px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: 'Courier New', monospace;
+        }
+
+        .theme-btn:hover {
+            background: var(--btn-hover);
+            transform: translateY(-2px);
+        }
+
+        .theme-btn.active {
+            background: var(--btn-operator);
+            color: white;
+            border-color: var(--btn-operator);
+        }
+
+        /* 计算器主体 */
+        .calculator {
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* 显示屏 */
+        .display {
+            background: var(--display-bg);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: right;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            gap: 10px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .display-expression {
+            font-size: 16px;
+            color: var(--display-text);
+            opacity: 0.7;
+            min-height: 24px;
+            word-wrap: break-word;
+        }
+
+        .display-result {
+            font-size: 36px;
+            color: var(--display-text);
+            font-weight: bold;
+            word-wrap: break-word;
+        }
+
+        .display-error {
+            color: #ff4444;
+            font-size: 18px;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* 按钮网格 */
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 20px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: var(--btn-bg);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .btn:hover {
+            background: var(--btn-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .btn:active {
+            background: var(--btn-active);
+            transform: translateY(0);
+        }
+
+        .btn-operator {
+            background: var(--btn-operator);
+            color: white;
+        }
+
+        .btn-operator:hover {
+            background: var(--btn-operator-hover);
+        }
+
+        .btn-function {
+            background: var(--btn-function);
+            color: white;
+            font-size: 14px;
+        }
+
+        .btn-function:hover {
+            background: var(--btn-function-hover);
+        }
+
+        .btn-equals {
+            grid-column: span 2;
+            background: var(--btn-operator);
+            color: white;
+        }
+
+        .btn-equals:hover {
+            background: var(--btn-operator-hover);
+        }
+
+        .btn-clear {
+            background: #ff4444;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #cc0000;
+        }
+
+        /* 历史记录和绘图区域 */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .clear-btn {
+            padding: 8px 16px;
+            background: var(--btn-function);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .clear-btn:hover {
+            background: var(--btn-function-hover);
+        }
+
+        /* 历史记录 */
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: var(--bg-display);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 4px solid var(--btn-operator);
+        }
+
+        .history-item:hover {
+            background: var(--btn-hover);
+            transform: translateX(5px);
+        }
+
+        .history-expression {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .history-result {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .history-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* 绘图区域 */
+        .graph-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .graph-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-display);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .graph-input:focus {
+            outline: none;
+            border-color: var(--btn-operator);
+        }
+
+        .graph-btn {
+            padding: 10px 20px;
+            background: var(--btn-operator);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .graph-btn:hover {
+            background: var(--btn-operator-hover);
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 400px;
+            background: var(--display-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #functionCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .canvas-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-display);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--btn-function);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--btn-function-hover);
+        }
+
+        /* 键盘快捷键提示 */
+        .keyboard-hint {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--bg-display);
+            border-radius: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .keyboard-hint h4 {
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .keyboard-hint ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 5px;
+        }
+
+        .keyboard-hint li {
+            padding: 3px 0;
+        }
+
+        .keyboard-hint kbd {
+            background: var(--btn-function);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-right: 5px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .buttons {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .btn {
+                padding: 15px;
+                font-size: 16px;
+            }
+
+            .display-result {
+                font-size: 28px;
+            }
+
+            .canvas-container {
+                height: 300px;
+            }
+
+            .theme-selector {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .theme-btn {
+                padding: 8px 15px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-selector">
+        <button class="theme-btn active" data-theme-value="light">浅色</button>
+        <button class="theme-btn" data-theme-value="dark">深色</button>
+        <button class="theme-btn" data-theme-value="retro">复古</button>
+    </div>
+
+    <div class="container">
+        <div class="calculator">
+            <div class="display">
+                <div class="display-expression" id="expression"></div>
+                <div class="display-result" id="result">0</div>
+            </div>
+
+            <div class="buttons">
+                <button class="btn btn-clear" data-action="clear">C</button>
+                <button class="btn btn-clear" data-action="backspace">←</button>
+                <button class="btn btn-function" data-action="paren-left">(</button>
+                <button class="btn btn-function" data-action="paren-right">)</button>
+                <button class="btn btn-operator" data-action="operator" data-value="/">÷</button>
+
+                <button class="btn btn-function" data-action="function" data-value="sin">sin</button>
+                <button class="btn btn-function" data-action="function" data-value="cos">cos</button>
+                <button class="btn btn-function" data-action="function" data-value="tan">tan</button>
+                <button class="btn btn-function" data-action="function" data-value="log">log</button>
+                <button class="btn btn-operator" data-action="operator" data-value="*">×</button>
+
+                <button class="btn" data-action="number" data-value="7">7</button>
+                <button class="btn" data-action="number" data-value="8">8</button>
+                <button class="btn" data-action="number" data-value="9">9</button>
+                <button class="btn btn-function" data-action="function" data-value="sqrt">√</button>
+                <button class="btn btn-operator" data-action="operator" data-value="-">−</button>
+
+                <button class="btn" data-action="number" data-value="4">4</button>
+                <button class="btn" data-action="number" data-value="5">5</button>
+                <button class="btn" data-action="number" data-value="6">6</button>
+                <button class="btn btn-function" data-action="function" data-value="pow">x^y</button>
+                <button class="btn btn-operator" data-action="operator" data-value="+">+</button>
+
+                <button class="btn" data-action="number" data-value="1">1</button>
+                <button class="btn" data-action="number" data-value="2">2</button>
+                <button class="btn" data-action="number" data-value="3">3</button>
+                <button class="btn btn-function" data-action="function" data-value="pi">π</button>
+                <button class="btn btn-operator" data-action="equals">=</button>
+
+                <button class="btn" data-action="number" data-value="0">0</button>
+                <button class="btn" data-action="decimal">.</button>
+                <button class="btn btn-function" data-action="function" data-value="e">e</button>
+                <button class="btn btn-function" data-action="function" data-value="abs">|x|</button>
+                <button class="btn btn-function" data-action="function" data-value="ln">ln</button>
+            </div>
+
+            <div class="keyboard-hint">
+                <h4>键盘快捷键</h4>
+                <ul>
+                    <li><kbd>0-9</kbd> 数字</li>
+                    <li><kbd>+,-,*,/</kbd> 运算符</li>
+                    <li><kbd>Enter</kbd> 计算</li>
+                    <li><kbd>Esc</kbd> 清除</li>
+                    <li><kbd>Backspace</kbd> 删除</li>
+                    <li><kbd>(,)</kbd> 括号</li>
+                    <li><kbd>.</kbd> 小数点</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">计算历史</h3>
+                    <button class="clear-btn" id="clearHistory">清空</button>
+                </div>
+                <div class="history-list" id="historyList">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        暂无历史记录
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">函数绘图</h3>
+                </div>
+                <div class="graph-controls">
+                    <input type="text" class="graph-input" id="functionInput" placeholder="输入函数，如：x^2 或 sin(x)">
+                    <button class="graph-btn" id="plotBtn">绘制</button>
+                    <button class="graph-btn" id="clearGraphBtn" style="background: var(--btn-function);">清空</button>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="functionCanvas"></canvas>
+                    <div class="canvas-info" id="canvasInfo">x: 0, y: 0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Shunting-yard 算法实现 ====================
+        class ShuntingYardParser {
+            constructor() {
+                this.operators = {
+                    '+': { precedence: 1, associativity: 'left' },
+                    '-': { precedence: 1, associativity: 'left' },
+                    '*': { precedence: 2, associativity: 'left' },
+                    '/': { precedence: 2, associativity: 'left' },
+                    '^': { precedence: 3, associativity: 'right' },
+                    'sin': { precedence: 4, associativity: 'left', function: true },
+                    'cos': { precedence: 4, associativity: 'left', function: true },
+                    'tan': { precedence: 4, associativity: 'left', function: true },
+                    'log': { precedence: 4, associativity: 'left', function: true },
+                    'ln': { precedence: 4, associativity: 'left', function: true },
+                    'sqrt': { precedence: 4, associativity: 'left', function: true },
+                    'abs': { precedence: 4, associativity: 'left', function: true }
+                };
+
+                this.constants = {
+                    'pi': Math.PI,
+                    'π': Math.PI,
+                    'e': Math.E
+                };
+            }
+
+            tokenize(expression) {
+                const tokens = [];
+                let i = 0;
+                const expr = expression.toLowerCase().replace(/\s/g, '');
+
+                while (i < expr.length) {
+                    const char = expr[i];
+
+                    // 数字
+                    if (/[0-9.]/.test(char)) {
+                        let num = '';
+                        while (i < expr.length && (/[0-9.]/.test(expr[i]))) {
+                            num += expr[i];
+                            i++;
+                        }
+                        tokens.push({ type: 'number', value: parseFloat(num) });
+                        continue;
+                    }
+
+                    // 运算符
+                    if (this.operators[char]) {
+                        tokens.push({ type: 'operator', value: char });
+                        i++;
+                        continue;
+                    }
+
+                    // 括号
+                    if (char === '(' || char === ')') {
+                        tokens.push({ type: 'paren', value: char });
+                        i++;
+                        continue;
+                    }
+
+                    // 函数名
+                    if (/[a-z]/.test(char)) {
+                        let name = '';
+                        while (i < expr.length && /[a-z]/.test(expr[i])) {
+                            name += expr[i];
+                            i++;
+                        }
+
+                        if (this.operators[name]) {
+                            tokens.push({ type: 'function', value: name });
+                        } else if (this.constants[name] !== undefined) {
+                            tokens.push({ type: 'number', value: this.constants[name] });
+                        } else {
+                            throw new Error(`未知的函数或常量: ${name}`);
+                        }
+                        continue;
+                    }
+
+                    i++;
+                }
+
+                return tokens;
+            }
+
+            shuntingYard(tokens) {
+                const output = [];
+                const stack = [];
+
+                for (const token of tokens) {
+                    if (token.type === 'number') {
+                        output.push(token);
+                    } else if (token.type === 'function') {
+                        stack.push(token);
+                    } else if (token.type === 'operator') {
+                        while (stack.length > 0 &&
+                               stack[stack.length - 1].type === 'operator' &&
+                               ((this.operators[token.value].associativity === 'left' &&
+                                 this.operators[token.value].precedence <= this.operators[stack[stack.length - 1].value].precedence) ||
+                                (this.operators[token.value].associativity === 'right' &&
+                                 this.operators[token.value].precedence < this.operators[stack[stack.length - 1].value].precedence))) {
+                            output.push(stack.pop());
+                        }
+                        stack.push(token);
+                    } else if (token.value === '(') {
+                        stack.push(token);
+                    } else if (token.value === ')') {
+                        while (stack.length > 0 && stack[stack.length - 1].value !== '(') {
+                            output.push(stack.pop());
+                        }
+                        if (stack.length > 0 && stack[stack.length - 1].value === '(') {
+                            stack.pop();
+                        }
+                        if (stack.length > 0 && stack[stack.length - 1].type === 'function') {
+                            output.push(stack.pop());
+                        }
+                    }
+                }
+
+                while (stack.length > 0) {
+                    output.push(stack.pop());
+                }
+
+                return output;
+            }
+
+            evaluateRPN(rpnTokens) {
+                const stack = [];
+
+                for (const token of rpnTokens) {
+                    if (token.type === 'number') {
+                        stack.push(token.value);
+                    } else if (token.type === 'operator') {
+                        const b = stack.pop();
+                        const a = stack.pop();
+
+                        switch (token.value) {
+                            case '+':
+                                stack.push(a + b);
+                                break;
+                            case '-':
+                                stack.push(a - b);
+                                break;
+                            case '*':
+                                stack.push(a * b);
+                                break;
+                            case '/':
+                                if (b === 0) {
+                                    throw new Error('除以零错误');
+                                }
+                                stack.push(a / b);
+                                break;
+                            case '^':
+                                stack.push(Math.pow(a, b));
+                                break;
+                        }
+                    } else if (token.type === 'function') {
+                        const a = stack.pop();
+                        switch (token.value) {
+                            case 'sin':
+                                stack.push(Math.sin(a));
+                                break;
+                            case 'cos':
+                                stack.push(Math.cos(a));
+                                break;
+                            case 'tan':
+                                stack.push(Math.tan(a));
+                                break;
+                            case 'log':
+                                stack.push(Math.log10(a));
+                                break;
+                            case 'ln':
+                                stack.push(Math.log(a));
+                                break;
+                            case 'sqrt':
+                                stack.push(Math.sqrt(a));
+                                break;
+                            case 'abs':
+                                stack.push(Math.abs(a));
+                                break;
+                        }
+                    }
+                }
+
+                if (stack.length !== 1) {
+                    throw new Error('表达式无效');
+                }
+
+                return stack[0];
+            }
+
+            parse(expression) {
+                try {
+                    const tokens = this.tokenize(expression);
+                    const rpn = this.shuntingYard(tokens);
+                    const result = this.evaluateRPN(rpn);
+                    return { success: true, result: this.roundResult(result) };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            roundResult(num) {
+                if (Math.abs(num) < 1e-10) return 0;
+                return Math.round(num * 1e10) / 1e10;
+            }
+        }
+
+        // ==================== 计算器类 ====================
+        class Calculator {
+            constructor() {
+                this.parser = new ShuntingYardParser();
+                this.expression = '';
+                this.result = '0';
+                this.history = [];
+                this.historyCounter = 0;
+                this.initElements();
+                this.initEventListeners();
+                this.loadHistory();
+            }
+
+            initElements() {
+                this.expressionDisplay = document.getElementById('expression');
+                this.resultDisplay = document.getElementById('result');
+                this.historyList = document.getElementById('historyList');
+            }
+
+            initEventListeners() {
+                // 按钮点击事件
+                document.querySelectorAll('.btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.handleButtonClick(btn);
+                    });
+                });
+
+                // 键盘事件
+                document.addEventListener('keydown', (e) => {
+                    this.handleKeyPress(e);
+                });
+
+                // 清空历史
+                document.getElementById('clearHistory').addEventListener('click', () => {
+                    this.clearHistory();
+                });
+
+                // 加载本地存储的历史记录
+                this.loadHistory();
+            }
+
+            handleButtonClick(btn) {
+                const action = btn.dataset.action;
+                const value = btn.dataset.value;
+
+                this.removeError();
+
+                switch (action) {
+                    case 'number':
+                        this.appendNumber(value);
+                        break;
+                    case 'operator':
+                        this.appendOperator(value);
+                        break;
+                    case 'function':
+                        this.appendFunction(value);
+                        break;
+                    case 'decimal':
+                        this.appendDecimal();
+                        break;
+                    case 'paren-left':
+                        this.appendOperator('(');
+                        break;
+                    case 'paren-right':
+                        this.appendOperator(')');
+                        break;
+                    case 'clear':
+                        this.clear();
+                        break;
+                    case 'backspace':
+                        this.backspace();
+                        break;
+                    case 'equals':
+                        this.calculate();
+                        break;
+                }
+            }
+
+            handleKeyPress(e) {
+                const key = e.key;
+
+                // 阻止默认行为以避免页面滚动
+                if (['Enter', 'Escape', 'Backspace', 'ArrowUp', 'ArrowDown'].includes(key)) {
+                    e.preventDefault();
+                }
+
+                if (/[0-9]/.test(key)) {
+                    this.appendNumber(key);
+                } else if (['+', '-', '*', '/'].includes(key)) {
+                    this.appendOperator(key);
+                } else if (key === '.') {
+                    this.appendDecimal();
+                } else if (key === '(' || key === ')') {
+                    this.appendOperator(key);
+                } else if (key === 'Enter' || key === '=') {
+                    this.calculate();
+                } else if (key === 'Escape' || key.toLowerCase() === 'c') {
+                    this.clear();
+                } else if (key === 'Backspace') {
+                    this.backspace();
+                }
+            }
+
+            appendNumber(num) {
+                if (this.result !== '0' && this.expression === '') {
+                    this.expression = this.result;
+                }
+                this.expression += num;
+                this.updateDisplay();
+            }
+
+            appendOperator(op) {
+                if (this.expression !== '') {
+                    const lastChar = this.expression.slice(-1);
+                    if (['+', '-', '*', '/', '^'].includes(lastChar)) {
+                        this.expression = this.expression.slice(0, -1) + op;
+                    } else {
+                        this.expression += op;
+                    }
+                } else if (op === '-') {
+                    this.expression = '-';
+                }
+                this.updateDisplay();
+            }
+
+            appendFunction(func) {
+                const funcMap = {
+                    'sin': 'sin(',
+                    'cos': 'cos(',
+                    'tan': 'tan(',
+                    'log': 'log(',
+                    'ln': 'ln(',
+                    'sqrt': 'sqrt(',
+                    'abs': 'abs(',
+                    'pow': '^',
+                    'pi': Math.PI.toString(),
+                    'e': Math.E.toString()
+                };
+
+                if (funcMap[func]) {
+                    this.expression += funcMap[func];
+                    this.updateDisplay();
+                }
+            }
+
+            appendDecimal() {
+                if (this.expression === '') {
+                    this.expression = '0.';
+                } else {
+                    const parts = this.expression.split(/[+\-*/^()]/);
+                    const lastPart = parts[parts.length - 1];
+                    if (!lastPart.includes('.')) {
+                        this.expression += '.';
+                    }
+                }
+                this.updateDisplay();
+            }
+
+            clear() {
+                this.expression = '';
+                this.result = '0';
+                this.updateDisplay();
+                this.removeError();
+            }
+
+            backspace() {
+                this.expression = this.expression.slice(0, -1);
+                this.updateDisplay();
+                this.removeError();
+            }
+
+            calculate() {
+                if (this.expression === '') return;
+
+                const parsed = this.parser.parse(this.expression);
+
+                if (parsed.success) {
+                    this.result = parsed.result.toString();
+                    this.addToHistory(this.expression, this.result);
+                    this.expression = '';
+                    this.updateDisplay();
+                } else {
+                    this.showError(parsed.error);
+                }
+            }
+
+            updateDisplay() {
+                this.expressionDisplay.textContent = this.expression;
+                this.resultDisplay.textContent = this.result;
+            }
+
+            showError(message) {
+                this.resultDisplay.textContent = '错误';
+                this.resultDisplay.classList.add('display-error');
+                this.expressionDisplay.textContent = message;
+
+                setTimeout(() => {
+                    this.removeError();
+                    this.updateDisplay();
+                }, 2000);
+            }
+
+            removeError() {
+                this.resultDisplay.classList.remove('display-error');
+            }
+
+            addToHistory(expression, result) {
+                const historyItem = {
+                    id: ++this.historyCounter,
+                    expression: expression,
+                    result: result,
+                    time: new Date().toLocaleTimeString()
+                };
+
+                this.history.unshift(historyItem);
+                this.saveHistory();
+                this.renderHistory();
+            }
+
+            renderHistory() {
+                if (this.history.length === 0) {
+                    this.historyList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">暂无历史记录</div>';
+                    return;
+                }
+
+                this.historyList.innerHTML = this.history.map(item => `
+                    <div class="history-item" data-id="${item.id}">
+                        <div class="history-expression">${item.expression} =</div>
+                        <div class="history-result">${item.result}</div>
+                        <div class="history-time">${item.time}</div>
+                    </div>
+                `).join('');
+
+                // 添加点击事件
+                this.historyList.querySelectorAll('.history-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const id = parseInt(item.dataset.id);
+                        const historyItem = this.history.find(h => h.id === id);
+                        if (historyItem) {
+                            this.expression = historyItem.expression;
+                            this.result = historyItem.result;
+                            this.updateDisplay();
+                        }
+                    });
+                });
+            }
+
+            saveHistory() {
+                localStorage.setItem('calculatorHistory', JSON.stringify(this.history));
+            }
+
+            loadHistory() {
+                const saved = localStorage.getItem('calculatorHistory');
+                if (saved) {
+                    this.history = JSON.parse(saved);
+                    this.historyCounter = this.history.length > 0 ? Math.max(...this.history.map(h => h.id)) : 0;
+                    this.renderHistory();
+                }
+            }
+
+            clearHistory() {
+                this.history = [];
+                this.historyCounter = 0;
+                localStorage.removeItem('calculatorHistory');
+                this.renderHistory();
+            }
+        }
+
+        // ==================== 函数绘图类 ====================
+        class FunctionGrapher {
+            constructor() {
+                this.canvas = document.getElementById('functionCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.parser = new ShuntingYardParser();
+                this.currentFunction = null;
+                this.scale = 50;
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.isDragging = false;
+                this.lastMouseX = 0;
+                this.lastMouseY = 0;
+
+                this.initCanvas();
+                this.initEventListeners();
+                this.drawGrid();
+            }
+
+            initCanvas() {
+                const container = this.canvas.parentElement;
+                this.canvas.width = container.clientWidth;
+                this.canvas.height = container.clientHeight;
+                this.centerX = this.canvas.width / 2;
+                this.centerY = this.canvas.height / 2;
+            }
+
+            initEventListeners() {
+                // 绘制按钮
+                document.getElementById('plotBtn').addEventListener('click', () => {
+                    this.plotFunction();
+                });
+
+                // 清除按钮
+                document.getElementById('clearGraphBtn').addEventListener('click', () => {
+                    this.clearGraph();
+                });
+
+                // 输入框回车
+                document.getElementById('functionInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.plotFunction();
+                    }
+                });
+
+                // 鼠标交互
+                this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.canvas.addEventListener('mouseup', () => this.onMouseUp());
+                this.canvas.addEventListener('mouseleave', () => this.onMouseUp());
+                this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
+
+                // 窗口大小变化
+                window.addEventListener('resize', () => {
+                    this.initCanvas();
+                    this.redraw();
+                });
+            }
+
+            onMouseDown(e) {
+                this.isDragging = true;
+                this.lastMouseX = e.clientX;
+                this.lastMouseY = e.clientY;
+                this.canvas.style.cursor = 'grabbing';
+            }
+
+            onMouseMove(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // 更新坐标显示
+                const mathX = (x - this.centerX - this.offsetX) / this.scale;
+                const mathY = -(y - this.centerY - this.offsetY) / this.scale;
+                document.getElementById('canvasInfo').textContent = `x: ${mathX.toFixed(2)}, y: ${mathY.toFixed(2)}`;
+
+                if (this.isDragging) {
+                    const dx = e.clientX - this.lastMouseX;
+                    const dy = e.clientY - this.lastMouseY;
+                    this.offsetX += dx;
+                    this.offsetY += dy;
+                    this.lastMouseX = e.clientX;
+                    this.lastMouseY = e.clientY;
+                    this.redraw();
+                }
+            }
+
+            onMouseUp() {
+                this.isDragging = false;
+                this.canvas.style.cursor = 'crosshair';
+            }
+
+            onWheel(e) {
+                e.preventDefault();
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                this.scale *= zoomFactor;
+                this.scale = Math.max(10, Math.min(200, this.scale));
+                this.redraw();
+            }
+
+            drawGrid() {
+                this.ctx.fillStyle = '#1a1a1a';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.ctx.strokeStyle = '#333';
+                this.ctx.lineWidth = 1;
+
+                // 绘制网格线
+                const gridSize = this.scale;
+                const startX = (this.offsetX % gridSize);
+                const startY = (this.offsetY % gridSize);
+
+                this.ctx.beginPath();
+                // 垂直线
+                for (let x = startX; x < this.canvas.width; x += gridSize) {
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height);
+                }
+                // 水平线
+                for (let y = startY; y < this.canvas.height; y += gridSize) {
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width, y);
+                }
+                this.ctx.stroke();
+
+                // 绘制坐标轴
+                this.ctx.strokeStyle = '#666';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                // X轴
+                this.ctx.moveTo(0, this.centerY + this.offsetY);
+                this.ctx.lineTo(this.canvas.width, this.centerY + this.offsetY);
+                // Y轴
+                this.ctx.moveTo(this.centerX + this.offsetX, 0);
+                this.ctx.lineTo(this.centerX + this.offsetX, this.canvas.height);
+                this.ctx.stroke();
+
+                // 绘制刻度标签
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.font = '12px Courier New';
+                this.ctx.textAlign = 'center';
+
+                // X轴刻度
+                for (let x = startX; x < this.canvas.width; x += gridSize) {
+                    const mathX = Math.round((x - this.centerX - this.offsetX) / this.scale);
+                    if (mathX !== 0) {
+                        this.ctx.fillText(mathX.toString(), x, this.centerY + this.offsetY + 15);
+                    }
+                }
+
+                // Y轴刻度
+                this.ctx.textAlign = 'left';
+                for (let y = startY; y < this.canvas.height; y += gridSize) {
+                    const mathY = Math.round(-(y - this.centerY - this.offsetY) / this.scale);
+                    if (mathY !== 0) {
+                        this.ctx.fillText(mathY.toString(), this.centerX + this.offsetX + 5, y + 4);
+                    }
+                }
+
+                // 原点
+                this.ctx.fillText('0', this.centerX + this.offsetX + 5, this.centerY + this.offsetY + 15);
+            }
+
+            plotFunction() {
+                const input = document.getElementById('functionInput').value.trim();
+                if (!input) return;
+
+                // 简化函数输入，自动添加 'f(x) = ' 部分
+                let funcExpression = input;
+                if (!input.includes('x')) {
+                    funcExpression = input; // 假设用户输入的是简单表达式
+                }
+
+                // 测试函数是否有效
+                try {
+                    const testExpr = funcExpression.replace(/x/g, '1');
+                    const result = this.parser.parse(testExpr);
+                    if (!result.success) {
+                        alert('函数表达式无效: ' + result.error);
+                        return;
+                    }
+                } catch (e) {
+                    alert('函数表达式无效: ' + e.message);
+                    return;
+                }
+
+                this.currentFunction = funcExpression;
+                this.redraw();
+            }
+
+            evaluateFunction(x) {
+                if (!this.currentFunction) return null;
+
+                const expr = this.currentFunction.replace(/x/g, `(${x})`);
+                const result = this.parser.parse(expr);
+                return result.success ? result.result : null;
+            }
+
+            drawFunction() {
+                if (!this.currentFunction) return;
+
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+
+                let firstPoint = true;
+                for (let pixelX = 0; pixelX < this.canvas.width; pixelX++) {
+                    const mathX = (pixelX - this.centerX - this.offsetX) / this.scale;
+                    const mathY = this.evaluateFunction(mathX);
+
+                    if (mathY !== null && !isNaN(mathY) && isFinite(mathY)) {
+                        const pixelY = this.centerY + this.offsetY - (mathY * this.scale);
+
+                        if (pixelY > -1000 && pixelY < this.canvas.height + 1000) {
+                            if (firstPoint) {
+                                this.ctx.moveTo(pixelX, pixelY);
+                                firstPoint = false;
+                            } else {
+                                this.ctx.lineTo(pixelX, pixelY);
+                            }
+                        } else {
+                            firstPoint = true;
+                        }
+                    } else {
+                        firstPoint = true;
+                    }
+                }
+
+                this.ctx.stroke();
+            }
+
+            redraw() {
+                this.drawGrid();
+                this.drawFunction();
+            }
+
+            clearGraph() {
+                this.currentFunction = null;
+                document.getElementById('functionInput').value = '';
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.scale = 50;
+                this.redraw();
+            }
+        }
+
+        // ==================== 主题管理 ====================
+        class ThemeManager {
+            constructor() {
+                this.currentTheme = localStorage.getItem('calculatorTheme') || 'light';
+                this.init();
+            }
+
+            init() {
+                this.setTheme(this.currentTheme);
+                this.initEventListeners();
+            }
+
+            initEventListeners() {
+                document.querySelectorAll('.theme-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const theme = btn.dataset.themeValue;
+                        this.setTheme(theme);
+                    });
+                });
+            }
+
+            setTheme(theme) {
+                this.currentTheme = theme;
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('calculatorTheme', theme);
+
+                // 更新按钮状态
+                document.querySelectorAll('.theme-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.themeValue === theme);
+                });
+            }
+        }
+
+        // ==================== 初始化应用 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            const calculator = new Calculator();
+            const grapher = new FunctionGrapher();
+            const themeManager = new ThemeManager();
+        });
+    </script>
+</body>
+</html>
