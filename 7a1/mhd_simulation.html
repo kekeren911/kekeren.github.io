@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>磁流体动力学模拟 - Magnetohydrodynamics</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #c8d6e5;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    display: flex;
+    height: 100vh;
+  }
+  #canvas-container {
+    flex: 1;
+    position: relative;
+    cursor: crosshair;
+  }
+  canvas { display: block; }
+  #sidebar {
+    width: 300px;
+    background: #0d1117;
+    border-left: 1px solid #1a2332;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  h1 {
+    font-size: 16px;
+    color: #00d4ff;
+    text-shadow: 0 0 20px rgba(0,212,255,0.3);
+    border-bottom: 1px solid #1a2332;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    letter-spacing: 2px;
+  }
+  .section {
+    background: #111922;
+    border: 1px solid #1a2332;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .section-title {
+    font-size: 12px;
+    color: #ff6b6b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  label { font-size: 12px; color: #8899aa; }
+  input[type="range"] {
+    width: 130px;
+    accent-color: #00d4ff;
+    background: transparent;
+  }
+  .value { font-size: 11px; color: #00d4ff; min-width: 36px; text-align: right; }
+  button {
+    background: #1a2332;
+    border: 1px solid #2a3a4a;
+    color: #c8d6e5;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    transition: all 0.2s;
+  }
+  button:hover { background: #2a3a4a; border-color: #00d4ff; color: #00d4ff; }
+  button.active { background: #0a2a3a; border-color: #00d4ff; color: #00d4ff; box-shadow: 0 0 10px rgba(0,212,255,0.2); }
+  .btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
+  .btn-group button { flex: 1; min-width: 60px; font-size: 10px; padding: 5px 6px; }
+  .stats {
+    font-size: 11px;
+    color: #556677;
+    line-height: 1.6;
+  }
+  .stats span { color: #00d4ff; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
+  .legend-item { font-size: 10px; display: flex; align-items: center; gap: 4px; }
+  .legend-color { width: 10px; height: 10px; border-radius: 2px; }
+  #info-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 11px;
+    color: #556677;
+    pointer-events: none;
+    line-height: 1.5;
+  }
+  .preset-group { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
+  .preset-group button { font-size: 10px; padding: 5px 4px; }
+</style>
+</head>
+<body>
+
+<div id="canvas-container">
+  <canvas id="canvas"></canvas>
+  <div id="info-overlay">MHD Simulation v2.0<br>左键交互 | 滚轮缩放场强</div>
+</div>
+
+<div id="sidebar">
+  <div>
+    <h1>&#9889; MHD FLUID LAB</h1>
+    <div style="font-size:10px;color:#445566;margin-top:4px;">
+      Magnetohydrodynamics Simulator
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">&#128171; 交互模式</div>
+    <div class="btn-group">
+      <button id="mode-stir" class="active" onclick="setMode('stir')">搅动流体</button>
+      <button id="mode-magnet" onclick="setMode('magnet')">放置磁极</button>
+      <button id="mode-jet" onclick="setMode('jet')">注入射流</button>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button id="mode-current" onclick="setMode('current')">注入电流</button>
+      <button id="mode-erase" onclick="setMode('erase')">擦除磁极</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">&#9881; 物理参数</div>
+    <div class="control-row">
+      <label>粘度 (ν)</label>
+      <input type="range" id="viscosity" min="0" max="100" value="1">
+      <div class="value" id="viscosity-val">0.0001</div>
+    </div>
+    <div class="control-row">
+      <label>磁场强度 (B₀)</label>
+      <input type="range" id="fieldStrength" min="1" max="200" value="60">
+      <div class="value" id="fieldStrength-val">0.60</div>
+    </div>
+    <div class="control-row">
+      <label>电导率 (σ)</label>
+      <input type="range" id="conductivity" min="0" max="100" value="40">
+      <div class="value" id="conductivity-val">0.40</div>
+    </div>
+    <div class="control-row">
+      <label>洛伦兹耦合</label>
+      <input type="range" id="lorentz" min="0" max="100" value="50">
+      <div class="value" id="lorentz-val">0.50</div>
+    </div>
+    <div class="control-row">
+      <label>时间步长</label>
+      <input type="range" id="dt" min="1" max="30" value="10">
+      <div class="value" id="dt-val">0.10</div>
+    </div>
+    <div class="control-row">
+      <label>粒子密度</label>
+      <input type="range" id="particleDensity" min="500" max="8000" value="3000" step="500">
+      <div class="value" id="particleDensity-val">3000</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">&#127912; 可视化</div>
+    <div class="btn-group">
+      <button id="viz-particles" class="active" onclick="setViz('particles')">粒子场</button>
+      <button id="viz-field" onclick="setViz('field')">B场线</button>
+      <button id="viz-velocity" onclick="setViz('velocity')">速度场</button>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button id="viz-vorticity" onclick="setViz('vorticity')">涡量</button>
+      <button id="viz-pressure" onclick="setViz('pressure')">压力场</button>
+      <button id="viz-current" onclick="setViz('current')">电流密度</button>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button id="viz-composite" onclick="setViz('composite')">复合视图</button>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-color" style="background:#ff4444"></div>N极</div>
+      <div class="legend-item"><div class="legend-color" style="background:#4444ff"></div>S极</div>
+      <div class="legend-item"><div class="legend-color" style="background:#00ffaa"></div>流体正向</div>
+      <div class="legend-item"><div class="legend-color" style="background:#ffff00"></div>洛伦兹力</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">&#128293; 预设场景</div>
+    <div class="preset-group">
+      <button onclick="preset('dipole')">偶极子流</button>
+      <button onclick="preset('hartmann')">Hartmann流</button>
+      <button onclick="preset('vortex')">磁涡旋</button>
+      <button onclick="preset('convection')">MHD对流</button>
+      <button onclick="preset('pinch')">Z-Pinch</button>
+      <button onclick="preset('turbulent')">湍流激发</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="btn-group">
+      <button onclick="resetSim()">重置模拟</button>
+      <button onclick="clearMagnets()">清除磁场</button>
+      <button id="pauseBtn" onclick="togglePause()">暂停</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">&#128202; 实时数据</div>
+    <div class="stats" id="stats">
+      FPS: <span>0</span> | 步数: <span>0</span><br>
+      磁极: <span>0</span> | 粒子: <span>0</span><br>
+      最大流速: <span>0.00</span><br>
+      最大B场: <span>0.00</span> | 最大涡量: <span>0.00</span><br>
+      动能: <span>0.00</span> | 磁能: <span>0.00</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== 磁流体动力学模拟引擎 ==========
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvas-container');
+
+// --- 网格参数 ---
+let N = 128;            // 网格分辨率
+let SIZE;
+let SCALE;
+let IX, IY;            // 偏移让模拟居中
+
+// --- 物理场 ---
+let u, v;               // 速度场
+let u0, v0;             // 速度源/中间缓冲
+let bx, by;             // 磁场
+let bx0, by0;           // 磁场中间缓冲
+let jx, jy;             // 电流密度 (J = curl B)
+let pressure;           // 压力场
+let curl;               // 涡量场
+let divB;               // div(B) 用于校正
+
+// --- 粒子系统 ---
+let particles = [];
+let NUM_PARTICLES = 3000;
+
+// --- 磁极 ---
+let magnets = [];
+
+// --- 状态 ---
+let interactionMode = 'stir';
+let visualization = 'particles';
+let paused = false;
+let stepCount = 0;
+let mouseDown = false;
+let mouseX = 0, mouseY = 0;
+let pmouseX = 0, pmouseY = 0;
+let lastTime = 0;
+let fps = 0;
+let frameCount = 0;
+let fpsTimer = 0;
+
+// --- 参数 ---
+let viscosity = 0.0001;
+let fieldStrength = 0.6;
+let conductivity = 0.4;
+let lorentzCoupling = 0.5;
+let dt = 0.1;
+
+function IXF(i, j) { return i + (N + 2) * j; }
+
+function allocField() {
+  const s = (N + 2) * (N + 2);
+  return new Float32Array(s);
+}
+
+function initSimulation() {
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  canvas.width = w;
+  canvas.height = h;
+
+  SIZE = Math.min(w, h) * 0.9;
+  SCALE = SIZE / N;
+  IX = (w - SIZE) / 2;
+  IY = (h - SIZE) / 2;
+
+  u = allocField(); v = allocField();
+  u0 = allocField(); v0 = allocField();
+  bx = allocField(); by = allocField();
+  bx0 = allocField(); by0 = allocField();
+  jx = allocField(); jy = allocField();
+  pressure = allocField();
+  curl = allocField();
+  divB = allocField();
+
+  initParticles();
+}
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particles.push({
+      x: Math.random() * N,
+      y: Math.random() * N,
+      age: Math.random() * 200,
+      maxAge: 150 + Math.random() * 150,
+      trail: []
+    });
+  }
+}
+
+// ========== 流体求解器 (Jos Stam 稳定流体) ==========
+
+function addSource(x, s, dt) {
+  for (let i = 0; i < x.length; i++) x[i] += dt * s[i];
+}
+
+function setBoundary(b, x) {
+  const M = N + 2;
+  for (let i = 1; i <= N; i++) {
+    x[IXF(0, i)]     = b === 1 ? -x[IXF(1, i)] : x[IXF(1, i)];
+    x[IXF(N+1, i)]   = b === 1 ? -x[IXF(N, i)] : x[IXF(N, i)];
+    x[IXF(i, 0)]     = b === 2 ? -x[IXF(i, 1)] : x[IXF(i, 1)];
+    x[IXF(i, N+1)]   = b === 2 ? -x[IXF(i, N)] : x[IXF(i, N)];
+  }
+  x[IXF(0, 0)]       = 0.5 * (x[IXF(1, 0)] + x[IXF(0, 1)]);
+  x[IXF(0, N+1)]     = 0.5 * (x[IXF(1, N+1)] + x[IXF(0, N)]);
+  x[IXF(N+1, 0)]     = 0.5 * (x[IXF(N, 0)] + x[IXF(N+1, 1)]);
+  x[IXF(N+1, N+1)]   = 0.5 * (x[IXF(N, N+1)] + x[IXF(N+1, N)]);
+}
+
+function diffuse(b, x, x0, diff, dt) {
+  const a = dt * diff * N * N;
+  if (a === 0) { x.set(x0); return; }
+  const denom = 1 + 4 * a;
+  for (let k = 0; k < 20; k++) {
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        x[IXF(i,j)] = (x0[IXF(i,j)] + a * (
+          x[IXF(i-1,j)] + x[IXF(i+1,j)] +
+          x[IXF(i,j-1)] + x[IXF(i,j+1)]
+        )) / denom;
+      }
+    }
+    setBoundary(b, x);
+  }
+}
+
+function advect(b, d, d0, u, v, dt) {
+  const dt0 = dt * N;
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      let x = i - dt0 * u[IXF(i,j)];
+      let y = j - dt0 * v[IXF(i,j)];
+      x = Math.max(0.5, Math.min(N + 0.5, x));
+      y = Math.max(0.5, Math.min(N + 0.5, y));
+      const i0 = Math.floor(x), i1 = i0 + 1;
+      const j0 = Math.floor(y), j1 = j0 + 1;
+      const s1 = x - i0, s0 = 1 - s1;
+      const t1 = y - j0, t0 = 1 - t1;
+      d[IXF(i,j)] = s0 * (t0 * d0[IXF(i0,j0)] + t1 * d0[IXF(i0,j1)]) +
+                     s1 * (t0 * d0[IXF(i1,j0)] + t1 * d0[IXF(i1,j1)]);
+    }
+  }
+  setBoundary(b, d);
+}
+
+function project(u, v, p, div) {
+  const h = 1.0 / N;
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      div[IXF(i,j)] = -0.5 * h * (
+        u[IXF(i+1,j)] - u[IXF(i-1,j)] +
+        v[IXF(i,j+1)] - v[IXF(i,j-1)]
+      );
+      p[IXF(i,j)] = 0;
+    }
+  }
+  setBoundary(0, div);
+  setBoundary(0, p);
+  for (let k = 0; k < 20; k++) {
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        p[IXF(i,j)] = (div[IXF(i,j)] +
+          p[IXF(i-1,j)] + p[IXF(i+1,j)] +
+          p[IXF(i,j-1)] + p[IXF(i,j+1)]
+        ) / 4;
+      }
+    }
+    setBoundary(0, p);
+  }
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      u[IXF(i,j)] -= 0.5 * N * (p[IXF(i+1,j)] - p[IXF(i-1,j)]);
+      v[IXF(i,j)] -= 0.5 * N * (p[IXF(i,j+1)] - p[IXF(i,j-1)]);
+    }
+  }
+  setBoundary(1, u);
+  setBoundary(2, v);
+}
+
+// ========== 磁场计算 ==========
+
+function computeMagneticField() {
+  // 清除
+  bx.fill(0); by.fill(0);
+
+  // 从磁极叠加磁场
+  for (const m of magnets) {
+    const gx = m.gx; const gy = m.gy;
+    const strength = m.strength * fieldStrength;
+
+    // 只更新附近区域以提升性能
+    const range = N * 0.6;
+    const iMin = Math.max(1, Math.floor(gx - range));
+    const iMax = Math.min(N, Math.ceil(gx + range));
+    const jMin = Math.max(1, Math.floor(gy - range));
+    const jMax = Math.min(N, Math.ceil(gy + range));
+
+    for (let j = jMin; j <= jMax; j++) {
+      for (let i = iMin; i <= iMax; i++) {
+        const dx = i - gx;
+        const dy = j - gy;
+        const r2 = dx * dx + dy * dy + 0.5; // +0.5 防止奇点
+        const r = Math.sqrt(r2);
+        const r3 = r2 * r;
+        // B = strength * (3(m·r)r - m) / r³   (偶极子场)
+        const mDotR = m.mx * dx + m.my * dy;
+        bx[IXF(i,j)] += strength * (3 * mDotR * dx - m.mx * r2) / r3;
+        by[IXF(i,j)] += strength * (3 * mDotR * dy - m.my * r2) / r3;
+      }
+    }
+  }
+}
+
+// ========== 磁场散度校正 (保持 div B = 0) ==========
+
+function correctDivB() {
+  const h = 1.0 / N;
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      divB[IXF(i,j)] = -0.5 * h * (
+        bx[IXF(i+1,j)] - bx[IXF(i-1,j)] +
+        by[IXF(i,j+1)] - by[IXF(i,j-1)]
+      );
+    }
+  }
+  const p = pressure;
+  p.fill(0);
+  setBoundary(0, divB);
+  setBoundary(0, p);
+  for (let k = 0; k < 10; k++) {
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        p[IXF(i,j)] = (divB[IXF(i,j)] +
+          p[IXF(i-1,j)] + p[IXF(i+1,j)] +
+          p[IXF(i,j-1)] + p[IXF(i,j+1)]
+        ) / 4;
+      }
+    }
+    setBoundary(0, p);
+  }
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      bx[IXF(i,j)] -= 0.5 * N * (p[IXF(i+1,j)] - p[IXF(i-1,j)]);
+      by[IXF(i,j)] -= 0.5 * N * (p[IXF(i,j+1)] - p[IXF(i,j-1)]);
+    }
+  }
+  setBoundary(1, bx);
+  setBoundary(2, by);
+}
+
+// ========== 电流密度与洛伦兹力 ==========
+
+function computeLorentzForce() {
+  // J = curl(B) (Ampere定律简化)
+  const h = 1.0 / N;
+  let maxJ = 0, maxV = 0, maxCurl = 0, kineticE = 0, magneticE = 0;
+
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      // 电流密度 J = ∇ × B (2D)
+      jx[IXF(i,j)] = (by[IXF(i+1,j)] - by[IXF(i-1,j)]) / (2 * h);
+      jy[IXF(i,j)] = -(bx[IXF(i,j+1)] - bx[IXF(i,j-1)]) / (2 * h);
+
+      const jMag = Math.sqrt(jx[IXF(i,j)]**2 + jy[IXF(i,j)]**2);
+      if (jMag > maxJ) maxJ = jMag;
+
+      // 洛伦兹力 F = J × B
+      const fx = lorentzCoupling * conductivity * (jy[IXF(i,j)] * 0 - 0 * bx[IXF(i,j)]);
+      // 2D: F = J × B → Fx = Jz*Bz component simplified
+      // In 2D MHD: F_lorentz = (∇×B)×B = -B·∇B + ∇(B²/2)
+      // Simplified 2D version:
+      const dBx_dx = (bx[IXF(i+1,j)] - bx[IXF(i-1,j)]) / (2 * h);
+      const dBy_dy = (by[IXF(i,j+1)] - by[IXF(i,j-1)]) / (2 * h);
+      const dBx_dy = (bx[IXF(i,j+1)] - bx[IXF(i,j-1)]) / (2 * h);
+      const dBy_dx = (by[IXF(i+1,j)] - by[IXF(i-1,j)]) / (2 * h);
+
+      // Magnetic pressure + tension
+      const B2 = bx[IXF(i,j)]**2 + by[IXF(i,j)]**2;
+      magneticE += B2;
+
+      const lfx = lorentzCoupling * conductivity * (
+        -bx[IXF(i,j)] * dBx_dx - by[IXF(i,j)] * dBx_dy
+      );
+      const lfy = lorentzCoupling * conductivity * (
+        -bx[IXF(i,j)] * dBy_dx - by[IXF(i,j)] * dBy_dy
+      );
+
+      u[IXF(i,j)] += dt * lfx;
+      v[IXF(i,j)] += dt * lfy;
+
+      const sVel = u[IXF(i,j)]**2 + v[IXF(i,j)]**2;
+      kineticE += sVel;
+      if (sVel > maxV) maxV = sVel;
+    }
+  }
+
+  // 计算涡量
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      curl[IXF(i,j)] = (v[IXF(i+1,j)] - v[IXF(i-1,j)] - u[IXF(i,j+1)] + u[IXF(i,j-1)]) * 0.5;
+      const ac = Math.abs(curl[IXF(i,j)]);
+      if (ac > maxCurl) maxCurl = ac;
+    }
+  }
+
+  // 磁场被流体平流 (感应方程 ∂B/∂t = ∇×(v×B) + η∇²B)
+  const magDiff = viscosity * 2; // 磁扩散率与粘度相关
+
+  // 平流 B
+  bx0.set(bx); by0.set(by);
+  advect(1, bx, bx0, u, v, dt);
+  advect(2, by, by0, u, v, dt);
+
+  // 磁扩散
+  bx0.set(bx); by0.set(by);
+  diffuse(1, bx, bx0, magDiff, dt);
+  diffuse(2, by, by0, magDiff, dt);
+
+  correctDivB();
+
+  return {
+    maxJ, maxV: Math.sqrt(maxV), maxCurl,
+    kineticE: kineticE * 0.5,
+    magneticE: magneticE * 0.5
+  };
+}
+
+// ========== 粒子更新 ==========
+
+function updateParticles() {
+  const dtN = dt * N;
+  for (const p of particles) {
+    const gi = Math.floor(p.x);
+    const gj = Math.floor(p.y);
+    if (gi < 1 || gi > N || gj < 1 || gj > N) {
+      resetParticle(p);
+      continue;
+    }
+    const s = p.x - gi, t = p.y - gj;
+    const idx = IXF;
+    const velU = (1-s)*((1-t)*u[idx(gi,gj)] + t*u[idx(gi,gj+1)]) +
+                 s*((1-t)*u[idx(gi+1,gj)] + t*u[idx(gi+1,gj+1)]);
+    const velV = (1-s)*((1-t)*v[idx(gi,gj)] + t*v[idx(gi,gj+1)]) +
+                 s*((1-t)*v[idx(gi+1,gj)] + t*v[idx(gi+1,gj+1)]);
+
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > 8) p.trail.shift();
+
+    p.x += dtN * velU;
+    p.y += dtN * velV;
+    p.age++;
+
+    if (p.x < 0.5 || p.x > N + 0.5 || p.y < 0.5 || p.y > N + 0.5 || p.age > p.maxAge) {
+      resetParticle(p);
+    }
+  }
+}
+
+function resetParticle(p) {
+  p.x = 1 + Math.random() * N;
+  p.y = 1 + Math.random() * N;
+  p.age = 0;
+  p.maxAge = 150 + Math.random() * 150;
+  p.trail = [];
+}
+
+// ========== 渲染 ==========
+
+function hslToRgb(h, s, l) {
+  h = h % 360; if (h < 0) h += 360;
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2*l - 1)) * s;
+  const x = c * (1 - Math.abs((h/60)%2 - 1));
+  const m = l - c/2;
+  let r, g, b;
+  if (h < 60) { r=c; g=x; b=0; }
+  else if (h < 120) { r=x; g=c; b=0; }
+  else if (h < 180) { r=0; g=c; b=x; }
+  else if (h < 240) { r=0; g=x; b=c; }
+  else if (h < 300) { r=x; g=0; b=c; }
+  else { r=c; g=0; b=x; }
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+
+function render(stats) {
+  const w = canvas.width, h = canvas.height;
+  ctx.fillStyle = '#060610';
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.save();
+  ctx.translate(IX, IY);
+
+  // 绘制模拟边界
+  ctx.strokeStyle = '#1a2332';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, 0, SIZE, SIZE);
+
+  if (visualization === 'composite') {
+    renderPressureField(0.3);
+    renderParticlesViz();
+    renderFieldArrows(6, 0.5);
+  } else if (visualization === 'particles') {
+    renderParticlesViz();
+  } else if (visualization === 'field') {
+    renderMagneticFieldLines();
+    renderParticlesViz();
+  } else if (visualization === 'velocity') {
+    renderFieldArrows(4, 1.0);
+    renderParticlesViz();
+  } else if (visualization === 'vorticity') {
+    renderVorticityField();
+  } else if (visualization === 'pressure') {
+    renderPressureField(1.0);
+  } else if (visualization === 'current') {
+    renderCurrentField();
+  }
+
+  // 绘制磁极
+  renderMagnets();
+
+  // 绘制网格边框发光
+  ctx.strokeStyle = '#1a2a3a';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00aaff';
+  ctx.shadowBlur = 10;
+  ctx.strokeRect(0, 0, SIZE, SIZE);
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
+function renderParticlesViz() {
+  for (const p of particles) {
+    const gi = Math.floor(p.x);
+    const gj = Math.floor(p.y);
+    if (gi < 1 || gi > N || gj < 1 || gj > N) continue;
+
+    const px = p.x * SCALE;
+    const py = p.y * SCALE;
+
+    // 速度着色
+    const velU = u[IXF(gi, gj)];
+    const velV = v[IXF(gi, gj)];
+    const speed = Math.sqrt(velU*velU + velV*velV);
+    const angle = Math.atan2(velV, velU);
+    const hue = ((angle / Math.PI * 180) + 360) % 360;
+    const alpha = Math.min(1, speed * 3) * Math.min(1, (1 - p.age / p.maxAge));
+
+    const [r, g, b] = hslToRgb(hue, 90, 40 + Math.min(speed * 30, 40));
+
+    // 拖尾
+    if (p.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(p.trail[0].x * SCALE, p.trail[0].y * SCALE);
+      for (let t = 1; t < p.trail.length; t++) {
+        ctx.lineTo(p.trail[t].x * SCALE, p.trail[t].y * SCALE);
+      }
+      ctx.lineTo(px, py);
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.4})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // 粒子点
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    const radius = 1.2 + Math.min(speed * 2, 2);
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function renderMagneticFieldLines() {
+  const step = 6;
+  ctx.lineWidth = 0.8;
+
+  for (let j = 2; j < N; j += step) {
+    for (let i = 2; i < N; i += step) {
+      const bxB = bx[IXF(i,j)];
+      const byB = by[IXF(i,j)];
+      const mag = Math.sqrt(bxB*bxB + byB*byB);
+      if (mag < 0.0001) continue;
+
+      const arrowLen = SCALE * step * 0.6 * Math.min(mag * 2, 1.5);
+      const nx = bxB / mag, ny = byB / mag;
+      const cx = i * SCALE, cy = j * SCALE;
+
+      const hue = 200 + Math.min(mag * 100, 80);
+      const [r, g, b] = hslToRgb(hue, 80, 50 + Math.min(mag * 20, 30));
+
+      ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(mag * 2, 0.8)})`;
+      ctx.beginPath();
+      ctx.moveTo(cx - nx * arrowLen * 0.5, cy - ny * arrowLen * 0.5);
+      ctx.lineTo(cx + nx * arrowLen * 0.5, cy + ny * arrowLen * 0.5);
+      ctx.stroke();
+
+      // 箭头
+      const headSize = arrowLen * 0.3;
+      ctx.fillStyle = `rgba(${r},${g},${b},${Math.min(mag * 2, 0.8)})`;
+      ctx.beginPath();
+      const ex = cx + nx * arrowLen * 0.5;
+      const ey = cy + ny * arrowLen * 0.5;
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - headSize * (nx - ny * 0.4), ey - headSize * (ny + nx * 0.4));
+      ctx.lineTo(ex - headSize * (nx + ny * 0.4), ey - headSize * (ny - nx * 0.4));
+      ctx.fill();
+    }
+  }
+}
+
+function renderFieldArrows(spacing, opacity) {
+  const step = spacing;
+  ctx.lineWidth = 0.6;
+
+  for (let j = step; j < N; j += step) {
+    for (let i = step; i < N; i += step) {
+      const velU = u[IXF(i,j)];
+      const velV = v[IXF(i,j)];
+      const speed = Math.sqrt(velU*velU + velV*velV);
+      if (speed < 0.0001) continue;
+
+      const arrowLen = SCALE * step * 0.5 * Math.min(speed * 5, 1.5);
+      const nx = velU / speed, ny = velV / speed;
+      const cx = i * SCALE, cy = j * SCALE;
+
+      const hue = ((Math.atan2(velV, velU) / Math.PI * 180) + 360) % 360;
+      const [r, g, b] = hslToRgb(hue, 100, 60);
+      const alpha = Math.min(speed * 5, opacity);
+
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + nx * arrowLen, cy + ny * arrowLen);
+      ctx.stroke();
+    }
+  }
+}
+
+function renderVorticityField() {
+  const imgData = ctx.createImageData(N, N);
+  const data = imgData.data;
+  let maxC = 0;
+  for (let j = 1; j <= N; j++)
+    for (let i = 1; i <= N; i++)
+      maxC = Math.max(maxC, Math.abs(curl[IXF(i,j)]));
+  maxC = maxC || 1;
+
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      const c = curl[IXF(i,j)] / maxC;
+      const idx = ((j-1)*N + (i-1)) * 4;
+      if (c > 0) {
+        data[idx] = Math.min(255, c * 400);
+        data[idx+1] = Math.min(255, c * 100);
+        data[idx+2] = Math.min(255, 50);
+      } else {
+        data[idx] = Math.min(255, 50);
+        data[idx+1] = Math.min(255, -c * 100);
+        data[idx+2] = Math.min(255, -c * 400);
+      }
+      data[idx+3] = Math.min(255, Math.abs(c) * 600);
+    }
+  }
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = N; tmpCanvas.height = N;
+  tmpCanvas.getContext('2d').putImageData(imgData, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(tmpCanvas, 0, 0, SIZE, SIZE);
+}
+
+function renderPressureField(globalAlpha) {
+  const imgData = ctx.createImageData(N, N);
+  const data = imgData.data;
+
+  // 计算压力 = 速度散度近似
+  const p = pressure;
+  let maxP = 0;
+  for (let j = 1; j <= N; j++)
+    for (let i = 1; i <= N; i++)
+      maxP = Math.max(maxP, Math.abs(p[IXF(i,j)]));
+  maxP = maxP || 1;
+
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      const val = p[IXF(i,j)] / maxP;
+      const idx = ((j-1)*N + (i-1)) * 4;
+      const abs = Math.abs(val);
+      if (val > 0) {
+        data[idx] = 20; data[idx+1] = 60; data[idx+2] = Math.round(100 + abs * 155);
+      } else {
+        data[idx] = Math.round(100 + abs * 155); data[idx+1] = 30; data[idx+2] = 40;
+      }
+      data[idx+3] = Math.round(abs * 200 * globalAlpha);
+    }
+  }
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = N; tmpCanvas.height = N;
+  tmpCanvas.getContext('2d').putImageData(imgData, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(tmpCanvas, 0, 0, SIZE, SIZE);
+}
+
+function renderCurrentField() {
+  const imgData = ctx.createImageData(N, N);
+  const data = imgData.data;
+  let maxJ = 0;
+  for (let j = 1; j <= N; j++)
+    for (let i = 1; i <= N; i++) {
+      const jMag = Math.sqrt(jx[IXF(i,j)]**2 + jy[IXF(i,j)]**2);
+      maxJ = Math.max(maxJ, jMag);
+    }
+  maxJ = maxJ || 1;
+
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      const jMag = Math.sqrt(jx[IXF(i,j)]**2 + jy[IXF(i,j)]**2) / maxJ;
+      const idx = ((j-1)*N + (i-1)) * 4;
+      data[idx] = Math.round(jMag * 255);
+      data[idx+1] = Math.round(jMag * 200);
+      data[idx+2] = Math.round(50 + (1-jMag) * 100);
+      data[idx+3] = Math.round(Math.min(jMag * 2, 1) * 255);
+    }
+  }
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = N; tmpCanvas.height = N;
+  tmpCanvas.getContext('2d').putImageData(imgData, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(tmpCanvas, 0, 0, SIZE, SIZE);
+
+  // 电流方向箭头
+  const step = 8;
+  for (let j = step; j < N; j += step) {
+    for (let i = step; i < N; i += step) {
+      const jMag = Math.sqrt(jx[IXF(i,j)]**2 + jy[IXF(i,j)]**2);
+      if (jMag < maxJ * 0.05) continue;
+      const nx = jx[IXF(i,j)] / jMag;
+      const ny = jy[IXF(i,j)] / jMag;
+      const len = SCALE * step * 0.4;
+      const cx = i * SCALE, cy = j * SCALE;
+      ctx.strokeStyle = `rgba(255,200,50,${Math.min(jMag/maxJ*3, 0.7)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + nx * len, cy + ny * len);
+      ctx.stroke();
+    }
+  }
+}
+
+function renderMagnets() {
+  for (const m of magnets) {
+    const px = m.gx * SCALE;
+    const py = m.gy * SCALE;
+    const isPositive = m.polarity > 0;
+
+    // 发光效果
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, SCALE * 4);
+    const color = isPositive ? '#ff4444' : '#4488ff';
+    grad.addColorStop(0, color + '60');
+    grad.addColorStop(0.5, color + '15');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    ctx.fillRect(px - SCALE*4, py - SCALE*4, SCALE*8, SCALE*8);
+
+    // 核心点
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(px, py, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 标记
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isPositive ? 'N' : 'S', px, py - 8);
+  }
+}
+
+// ========== 物理步进 ==========
+
+function velStep() {
+  addSource(u, u0, dt);
+  addSource(v, v0, dt);
+
+  // 添加交互力
+  if (mouseDown && interactionMode === 'stir') {
+    const gi = (mouseX - IX) / SCALE;
+    const gj = (mouseY - IY) / SCALE;
+    const dx = pmouseX - mouseX;
+    const dy = pmouseY - mouseY;
+    addForceAt(gi, gj, dx * 0.5, dy * 0.5, 3);
+  }
+  if (mouseDown && interactionMode === 'jet') {
+    const gi = (mouseX - IX) / SCALE;
+    const gj = (mouseY - IY) / SCALE;
+    addForceAt(gi, gj, 5, 0, 4);
+  }
+  if (mouseDown && interactionMode === 'current') {
+    const gi = (mouseX - IX) / SCALE;
+    const gj = (mouseY - IY) / SCALE;
+    for (let dj = -3; dj <= 3; dj++) {
+      for (let di = -3; di <= 3; di++) {
+        const ii = Math.round(gi) + di;
+        const jj = Math.round(gj) + dj;
+        if (ii >= 1 && ii <= N && jj >= 1 && jj <= N) {
+          const r = Math.sqrt(di*di + dj*dj);
+          const falloff = Math.exp(-r * 0.5);
+          bx[IXF(ii,jj)] += dt * 0.3 * falloff;
+          by[IXF(ii,jj)] += dt * 0.3 * falloff * (di > 0 ? -1 : 1);
+        }
+      }
+    }
+  }
+
+  u0.set(u); v0.set(v);
+  diffuse(1, u, u0, viscosity, dt);
+  diffuse(2, v, v0, viscosity, dt);
+
+  project(u, v, u0, v0);
+
+  u0.set(u); v0.set(v);
+  advect(1, u, u0, u0, v0, dt);
+  advect(2, v, v0, u0, v0, dt);
+
+  project(u, v, u0, v0);
+}
+
+function addForceAt(gx, gy, fx, fy, radius) {
+  const r = Math.round(radius);
+  const gi = Math.round(gx), gj = Math.round(gy);
+  for (let dj = -r; dj <= r; dj++) {
+    for (let di = -r; di <= r; di++) {
+      const ii = gi + di, jj = gj + dj;
+      if (ii >= 1 && ii <= N && jj >= 1 && jj <= N) {
+        const dist = Math.sqrt(di*di + dj*dj);
+        const falloff = Math.exp(-dist / radius);
+        u[IXF(ii,jj)] += fx * falloff;
+        v[IXF(ii,jj)] += fy * falloff;
+      }
+    }
+  }
+}
+
+function simStep() {
+  if (paused) return;
+
+  u0.fill(0); v0.fill(0);
+
+  computeMagneticField();
+  correctDivB();
+
+  velStep();
+
+  const stats = computeLorentzForce();
+  updateParticles();
+
+  stepCount++;
+  updateStatsDisplay(stats);
+
+  // 衰减
+  for (let i = 0; i < u.length; i++) {
+    u[i] *= 0.999;
+    v[i] *= 0.999;
+  }
+
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+}
+
+// ========== UI ==========
+
+function setMode(mode) {
+  interactionMode = mode;
+  document.querySelectorAll('[id^="mode-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-' + mode).classList.add('active');
+}
+
+function setViz(viz) {
+  visualization = viz;
+  document.querySelectorAll('[id^="viz-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('viz-' + viz).classList.add('active');
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? '继续' : '暂停';
+}
+
+function resetSim() {
+  u.fill(0); v.fill(0); u0.fill(0); v0.fill(0);
+  bx.fill(0); by.fill(0); bx0.fill(0); by0.fill(0);
+  jx.fill(0); jy.fill(0); pressure.fill(0);
+  curl.fill(0); divB.fill(0);
+  initParticles();
+  stepCount = 0;
+}
+
+function clearMagnets() {
+  magnets = [];
+}
+
+function updateStatsDisplay(stats) {
+  const el = document.getElementById('stats');
+  el.innerHTML = `FPS: <span>${fps}</span> | 步数: <span>${stepCount}</span><br>` +
+    `磁极: <span>${magnets.length}</span> | 粒子: <span>${particles.length}</span><br>` +
+    `最大流速: <span>${stats?.maxV.toFixed(3) || 0}</span><br>` +
+    `最大B场: <span>${stats?.maxJ.toFixed(3) || 0}</span> | 最大涡量: <span>${stats?.maxCurl.toFixed(3) || 0}</span><br>` +
+    `动能: <span>${stats?.kineticE.toFixed(2) || 0}</span> | 磁能: <span>${stats?.magneticE.toFixed(2) || 0}</span>`;
+}
+
+function readParams() {
+  viscosity = document.getElementById('viscosity').value / 10000;
+  fieldStrength = document.getElementById('fieldStrength').value / 100;
+  conductivity = document.getElementById('conductivity').value / 100;
+  lorentzCoupling = document.getElementById('lorentz').value / 100;
+  dt = document.getElementById('dt').value / 100;
+  const newCount = parseInt(document.getElementById('particleDensity').value);
+  if (newCount !== NUM_PARTICLES) {
+    NUM_PARTICLES = newCount;
+    initParticles();
+  }
+
+  document.getElementById('viscosity-val').textContent = viscosity.toFixed(4);
+  document.getElementById('fieldStrength-val').textContent = fieldStrength.toFixed(2);
+  document.getElementById('conductivity-val').textContent = conductivity.toFixed(2);
+  document.getElementById('lorentz-val').textContent = lorentzCoupling.toFixed(2);
+  document.getElementById('dt-val').textContent = dt.toFixed(2);
+  document.getElementById('particleDensity-val').textContent = NUM_PARTICLES;
+}
+
+// ========== 预设 ==========
+
+function preset(name) {
+  resetSim();
+  clearMagnets();
+
+  if (name === 'dipole') {
+    // 偶极子在中心，从左注入流
+    magnets.push({ gx: N/2, gy: N/2, mx: 1, my: 0, strength: 3, polarity: 1 });
+    magnets.push({ gx: N*0.8, gy: N/2, mx: -1, my: 0, strength: 3, polarity: -1 });
+    for (let j = 1; j <= N; j++) {
+      u[IXF(2,j)] = 0.3;
+    }
+    document.getElementById('fieldStrength').value = 80;
+  }
+  else if (name === 'hartmann') {
+    // Hartmann流：上下平板+横向磁场
+    magnets.push({ gx: N/2, gy: -N*0.3, mx: 1, my: 0, strength: 5, polarity: 1 });
+    magnets.push({ gx: N/2, gy: N*1.3, mx: 1, my: 0, strength: 5, polarity: 1 });
+    for (let i = 1; i <= N; i++) {
+      for (let j = Math.floor(N*0.3); j <= Math.floor(N*0.7); j++) {
+        u[IXF(i,j)] = 0.5 * Math.sin(Math.PI * (j - N*0.3) / (N*0.4));
+      }
+    }
+    document.getElementById('viscosity').value = 5;
+    document.getElementById('fieldStrength').value = 100;
+  }
+  else if (name === 'vortex') {
+    // 磁涡旋：中心磁极 + 旋转流
+    magnets.push({ gx: N/2, gy: N/2, mx: 0, my: 1, strength: 4, polarity: 1 });
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        const dx = i - N/2, dy = j - N/2;
+        const r = Math.sqrt(dx*dx + dy*dy) + 0.1;
+        const v = 0.3 * Math.exp(-r*r/(N*N*0.02));
+        u[IXF(i,j)] = -dy / r * v;
+        v[IXF(i,j)] = dx / r * v;
+      }
+    }
+    document.getElementById('fieldStrength').value = 100;
+    document.getElementById('lorentz').value = 70;
+  }
+  else if (name === 'convection') {
+    // MHD对流：底部加热 + 磁场
+    magnets.push({ gx: N*0.25, gy: N*0.2, mx: 1, my: 0, strength: 3, polarity: 1 });
+    magnets.push({ gx: N*0.75, gy: N*0.8, mx: -1, my: 0, strength: 3, polarity: -1 });
+    magnets.push({ gx: N*0.6, gy: N*0.3, mx: 0, my: 1, strength: 2, polarity: 1 });
+    for (let i = Math.floor(N*0.3); i <= Math.floor(N*0.7); i++) {
+      v[IXF(i, N-2)] = -0.4;
+    }
+    document.getElementById('viscosity').value = 2;
+    document.getElementById('fieldStrength').value = 60;
+  }
+  else if (name === 'pinch') {
+    // Z-Pinch：圆柱电流产生压缩
+    for (let k = 0; k < 8; k++) {
+      const angle = k * Math.PI * 2 / 8;
+      const r = N * 0.35;
+      magnets.push({
+        gx: N/2 + r * Math.cos(angle),
+        gy: N/2 + r * Math.sin(angle),
+        mx: Math.cos(angle + Math.PI/2),
+        my: Math.sin(angle + Math.PI/2),
+        strength: 2, polarity: k % 2 === 0 ? 1 : -1
+      });
+    }
+    // 向心初始流
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        const dx = i - N/2, dy = j - N/2;
+        const r = Math.sqrt(dx*dx + dy*dy) + 0.1;
+        const v = -0.2 * Math.exp(-r*r/(N*N*0.04));
+        u[IXF(i,j)] = dx / r * v;
+        v[IXF(i,j)] = dy / r * v;
+      }
+    }
+    document.getElementById('fieldStrength').value = 90;
+    document.getElementById('lorentz').value = 80;
+  }
+  else if (name === 'turbulent') {
+    // 湍流激发：多磁极 + 随机扰动
+    for (let k = 0; k < 6; k++) {
+      magnets.push({
+        gx: N*0.2 + Math.random() * N*0.6,
+        gy: N*0.2 + Math.random() * N*0.6,
+        mx: Math.random() * 2 - 1,
+        my: Math.random() * 2 - 1,
+        strength: 1 + Math.random() * 3,
+        polarity: Math.random() > 0.5 ? 1 : -1
+      });
+    }
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        u[IXF(i,j)] = (Math.random() - 0.5) * 0.3;
+        v[IXF(i,j)] = (Math.random() - 0.5) * 0.3;
+      }
+    }
+    document.getElementById('fieldStrength').value = 70;
+    document.getElementById('viscosity').value = 1;
+  }
+  readParams();
+}
+
+// ========== 事件处理 ==========
+
+canvas.addEventListener('mousedown', (e) => {
+  mouseDown = true;
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+  handleClick(e);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  pmouseX = mouseX;
+  pmouseY = mouseY;
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+
+canvas.addEventListener('mouseup', () => { mouseDown = false; });
+canvas.addEventListener('mouseleave', () => { mouseDown = false; });
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+function handleClick(e) {
+  const gx = (e.clientX - IX) / SCALE;
+  const gy = (e.clientY - IY) / SCALE;
+
+  if (interactionMode === 'magnet') {
+    const polarity = e.button === 2 ? -1 : 1; // 右键=负极
+    magnets.push({
+      gx, gy,
+      mx: polarity, my: 0,
+      strength: 2,
+      polarity
+    });
+  } else if (interactionMode === 'erase') {
+    // 移除最近的磁极
+    let minDist = Infinity, minIdx = -1;
+    for (let i = 0; i < magnets.length; i++) {
+      const d = (magnets[i].gx - gx)**2 + (magnets[i].gy - gy)**2;
+      if (d < minDist) { minDist = d; minIdx = i; }
+    }
+    if (minDist < 200 && minIdx >= 0) magnets.splice(minIdx, 1);
+  }
+}
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (interactionMode === 'magnet') {
+    const gx = (e.clientX - IX) / SCALE;
+    const gy = (e.clientY - IY) / SCALE;
+    magnets.push({ gx, gy, mx: -1, my: 0, strength: 2, polarity: -1 });
+  }
+});
+
+// 触摸支持
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouseDown = true;
+  mouseX = t.clientX; mouseY = t.clientY;
+  pmouseX = mouseX; pmouseY = mouseY;
+  handleClick({ clientX: t.clientX, clientY: t.clientY, button: 0 });
+});
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  pmouseX = mouseX; pmouseY = mouseY;
+  mouseX = t.clientX; mouseY = t.clientY;
+});
+canvas.addEventListener('touchend', () => { mouseDown = false; });
+
+window.addEventListener('resize', () => {
+  initSimulation();
+});
+
+// ========== 主循环 ==========
+
+function animate(time) {
+  requestAnimationFrame(animate);
+
+  // FPS计算
+  frameCount++;
+  if (time - fpsTimer >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    fpsTimer = time;
+  }
+
+  readParams();
+  simStep();
+  render();
+}
+
+// 启动
+initSimulation();
+preset('vortex');
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
