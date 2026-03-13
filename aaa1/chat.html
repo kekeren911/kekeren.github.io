@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WeChat Chat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --wechat-green: #07C160;
+    --nav-bg: #EDEDED;
+    --chat-bg: #EDEDED;
+    --bubble-self: #95EC69;
+    --bubble-other: #FFFFFF;
+    --text-primary: #111;
+    --text-secondary: #888;
+    --border: #D9D9D9;
+    --input-bg: #F7F7F7;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .phone {
+    width: 375px;
+    height: 720px;
+    background: var(--chat-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+
+  /* ===== Nav Bar ===== */
+  .nav {
+    background: var(--nav-bg);
+    padding: 48px 16px 10px;
+    display: flex;
+    align-items: center;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+  }
+  .nav-back {
+    font-size: 22px;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 4px 8px 4px 0;
+    user-select: none;
+  }
+  .nav-title {
+    flex: 1;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .nav-more {
+    font-size: 22px;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 4px 0 4px 8px;
+    user-select: none;
+  }
+
+  /* ===== Chat Area ===== */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chat-area::-webkit-scrollbar { width: 0; }
+
+  /* ===== Time Divider ===== */
+  .time-label {
+    text-align: center;
+    font-size: 11px;
+    color: #B2B2B2;
+    padding: 4px 0;
+    user-select: none;
+  }
+
+  /* ===== Message Row ===== */
+  .msg-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 100%;
+    animation: msgIn .25s ease-out;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg-row.self { flex-direction: row-reverse; }
+
+  /* ===== Avatar ===== */
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: #ccc;
+  }
+
+  /* ===== Bubble ===== */
+  .bubble {
+    max-width: 65%;
+    padding: 9px 13px;
+    border-radius: 4px;
+    font-size: 15px;
+    line-height: 1.5;
+    position: relative;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  /* other: white bubble with left triangle */
+  .msg-row:not(.self) .bubble {
+    background: var(--bubble-other);
+  }
+  .msg-row:not(.self) .bubble::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 12px;
+    border: 6px solid transparent;
+    border-right-color: var(--bubble-other);
+    border-left: 0;
+  }
+  /* self: green bubble with right triangle */
+  .msg-row.self .bubble {
+    background: var(--bubble-self);
+  }
+  .msg-row.self .bubble::before {
+    content: "";
+    position: absolute;
+    right: -6px;
+    top: 12px;
+    border: 6px solid transparent;
+    border-left-color: var(--bubble-self);
+    border-right: 0;
+  }
+
+  /* ===== Typing Indicator ===== */
+  .typing-indicator span {
+    display: inline-block;
+    width: 7px; height: 7px;
+    background: #999;
+    border-radius: 50%;
+    margin: 0 1.5px;
+    animation: bounce 1.2s infinite;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: .15s; }
+  .typing-indicator span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  /* ===== Input Bar ===== */
+  .input-bar {
+    background: var(--input-bg);
+    border-top: 0.5px solid var(--border);
+    padding: 8px 10px;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .input-bar button {
+    width: 34px; height: 34px;
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s;
+  }
+  .input-bar button:hover { background: #e0e0e0; }
+
+  .input-wrap {
+    flex: 1;
+    background: #fff;
+    border-radius: 6px;
+    border: 0.5px solid #ddd;
+    padding: 8px 10px;
+    font-size: 15px;
+    line-height: 1.4;
+    max-height: 100px;
+    overflow-y: auto;
+    outline: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    -webkit-user-modify: plain-text;
+  }
+  .input-wrap[contenteditable]:empty::before {
+    content: attr(data-placeholder);
+    color: #B2B2B2;
+    pointer-events: none;
+  }
+
+  .send-btn {
+    width: auto !important;
+    padding: 0 12px !important;
+    font-size: 14px !important;
+    color: #fff !important;
+    background: var(--wechat-green) !important;
+    border-radius: 6px !important;
+    height: 34px;
+    font-weight: 500;
+  }
+  .send-btn:hover { background: #06ad56 !important; }
+  .send-btn.hide { opacity: 0; pointer-events: none; }
+
+  /* ===== Voice / Add icons (decorative) ===== */
+  .icon-btn { position: relative; }
+
+  /* ===== Mobile responsive ===== */
+  @media (max-width: 420px) {
+    body { background: var(--chat-bg); }
+    .phone { width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <!-- Nav -->
+  <div class="nav">
+    <span class="nav-back">&#x2190;</span>
+    <span class="nav-title" id="contactName">张三</span>
+    <span class="nav-more">&#8942;</span>
+  </div>
+
+  <!-- Chat Messages -->
+  <div class="chat-area" id="chatArea"></div>
+
+  <!-- Input -->
+  <div class="input-bar">
+    <button class="icon-btn" title="语音">&#x1f3a4;</button>
+    <div class="input-wrap" contenteditable="true" id="inputBox" data-placeholder="输入消息..."></div>
+    <button class="icon-btn" title="表情">&#x1f60a;</button>
+    <button class="icon-btn" title="更多">+</button>
+    <button class="send-btn hide" id="sendBtn">发送</button>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+const chatArea = $('#chatArea');
+const inputBox = $('#inputBox');
+const sendBtn  = $('#sendBtn');
+
+// ===== SVG avatars =====
+const SELF_AVATAR = createAvatarSVG('#07C160', '我');
+const OTHER_AVATAR = createAvatarSVG('#4A90D9', '张');
+
+function createAvatarSVG(bg, letter) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" rx="6" fill="${bg}"/><text x="20" y="27" text-anchor="middle" fill="#fff" font-size="16" font-family="sans-serif" font-weight="600">${letter}</text></svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+// ===== Auto-replies =====
+const REPLIES = [
+  '好的，收到！',
+  '哈哈，没问题',
+  '在呢，怎么了？',
+  '我知道了，稍等一下',
+  '真的吗？太好了！',
+  '嗯嗯，了解了',
+  '下次一起吃饭吧',
+  '好的好的',
+  '我看看',
+  '明白了，我这就去办',
+  '你说得对',
+  '行，没问题',
+];
+
+// ===== Core Functions =====
+function scrollBottom() {
+  requestAnimationFrame(() => chatArea.scrollTop = chatArea.scrollHeight);
+}
+
+function addTimeLabel(text) {
+  const el = document.createElement('div');
+  el.className = 'time-label';
+  el.textContent = text;
+  chatArea.appendChild(el);
+  return el;
+}
+
+function addMessage(text, isSelf) {
+  const row = document.createElement('div');
+  row.className = 'msg-row' + (isSelf ? ' self' : '');
+
+  const avatar = document.createElement('img');
+  avatar.className = 'avatar';
+  avatar.src = isSelf ? SELF_AVATAR : OTHER_AVATAR;
+  avatar.alt = isSelf ? 'me' : 'other';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  chatArea.appendChild(row);
+  scrollBottom();
+  return bubble;
+}
+
+function showTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg-row typing-row';
+
+  const avatar = document.createElement('img');
+  avatar.className = 'avatar';
+  avatar.src = OTHER_AVATAR;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = '<span class="typing-indicator"><span></span><span></span><span></span></span>';
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  chatArea.appendChild(row);
+  scrollBottom();
+  return row;
+}
+
+function removeTyping(row) {
+  if (row && row.parentNode) row.parentNode.removeChild(row);
+}
+
+function sendMessage() {
+  const text = inputBox.textContent.trim();
+  if (!text) return;
+
+  addMessage(text, true);
+  inputBox.textContent = '';
+  sendBtn.classList.add('hide');
+
+  // Simulate reply
+  const typingRow = showTyping();
+  const delay = 800 + Math.random() * 1500;
+  setTimeout(() => {
+    removeTyping(typingRow);
+    const reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
+    addMessage(reply, false);
+  }, delay);
+}
+
+// ===== Input Events =====
+inputBox.addEventListener('input', () => {
+  const hasText = inputBox.textContent.trim().length > 0;
+  sendBtn.classList.toggle('hide', !hasText);
+});
+
+inputBox.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sendBtn.addEventListener('click', sendMessage);
+
+// ===== Initial Messages =====
+(function initChat() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const timeStr = `${now.getHours()}:${pad(now.getMinutes())}`;
+
+  addTimeLabel(`${now.getMonth()+1}月${now.getDate()}日 ${timeStr}`);
+
+  const initMsgs = [
+    { text: '在吗？最近怎么样', self: false },
+    { text: '在的，挺好的！你呢？', self: true },
+    { text: '我也不错，周末有空一起吃饭吗？', self: false },
+    { text: '好呀，你定地方吧', self: true },
+  ];
+
+  initMsgs.forEach((m, i) => {
+    setTimeout(() => addMessage(m.text, m.self), i * 120);
+  });
+})();
+</script>
+</body>
+</html>
