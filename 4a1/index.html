@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宠物饮水量追踪</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --sky: #e0f4ff;
+    --sky-mid: #b8e4fd;
+    --ocean: #4facfe;
+    --ocean-deep: #3a8fd8;
+    --mint: #43e8d8;
+    --mint-soft: #a8f0e6;
+    --coral: #ff8a80;
+    --coral-light: #ffcdc7;
+    --sand: #ffecd2;
+    --lavender: #c3b1e1;
+    --bg: #f4fbff;
+    --card: #ffffff;
+    --text: #2c3e50;
+    --text-light: #7f8c9a;
+    --shadow: rgba(79, 172, 254, 0.10);
+    --shadow-md: 0 4px 20px rgba(79, 172, 254, 0.10);
+    --shadow-lg: 0 8px 32px rgba(79, 172, 254, 0.15);
+    --radius: 20px;
+    --radius-sm: 14px;
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ---- bubble decorations ---- */
+  body::before, body::after {
+    content: '';
+    position: fixed;
+    border-radius: 50%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .45;
+  }
+  body::before {
+    width: 420px; height: 420px;
+    background: radial-gradient(circle, var(--sky-mid) 0%, transparent 70%);
+    top: -120px; right: -100px;
+  }
+  body::after {
+    width: 340px; height: 340px;
+    background: radial-gradient(circle, var(--mint-soft) 0%, transparent 70%);
+    bottom: -80px; left: -90px;
+  }
+
+  .bubbles {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .bubble {
+    position: absolute;
+    bottom: -80px;
+    border-radius: 50%;
+    background: var(--sky-mid);
+    opacity: .25;
+    animation: rise linear infinite;
+  }
+  .bubble:nth-child(1) { width:40px; height:40px; left:8%; animation-duration:12s; animation-delay:0s; }
+  .bubble:nth-child(2) { width:24px; height:24px; left:22%; animation-duration:10s; animation-delay:2s; }
+  .bubble:nth-child(3) { width:56px; height:56px; left:40%; animation-duration:14s; animation-delay:1s; }
+  .bubble:nth-child(4) { width:32px; height:32px; left:58%; animation-duration:11s; animation-delay:3s; }
+  .bubble:nth-child(5) { width:48px; height:48px; left:75%; animation-duration:13s; animation-delay:0.5s; }
+  .bubble:nth-child(6) { width:20px; height:20px; left:90%; animation-duration:9s; animation-delay:4s; }
+
+  @keyframes rise {
+    0%   { transform: translateY(0) scale(1);   opacity: .25; }
+    50%  { opacity: .35; }
+    100% { transform: translateY(-110vh) scale(.6); opacity: 0; }
+  }
+
+  /* ---- layout ---- */
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 840px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  /* ---- header ---- */
+  .header {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .header .icon {
+    display: inline-block;
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, var(--sky), var(--ocean));
+    border-radius: 50%;
+    line-height: 72px;
+    font-size: 36px;
+    box-shadow: 0 6px 24px rgba(79,172,254,.25);
+    margin-bottom: 14px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--ocean), var(--mint));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 1px;
+  }
+  .header p {
+    color: var(--text-light);
+    font-size: 15px;
+    margin-top: 6px;
+  }
+
+  /* ---- pet selector ---- */
+  .pet-bar {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .pet-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 22px;
+    border: 2px solid var(--sky-mid);
+    border-radius: 50px;
+    background: var(--card);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-light);
+    transition: all .25s;
+  }
+  .pet-btn .emoji { font-size: 22px; }
+  .pet-btn.active {
+    border-color: var(--ocean);
+    color: var(--ocean);
+    background: linear-gradient(135deg, #f0faff, #e8f6ff);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* ---- stat cards ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    box-shadow: var(--shadow-md);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+  }
+  .stat-card .label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-size: 30px;
+    font-weight: 800;
+  }
+  .stat-card .unit {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-left: 2px;
+  }
+  .stat-card.total .value   { color: var(--ocean); }
+  .stat-card.avg .value     { color: var(--mint); color: #21b8a6; }
+  .stat-card.max .value     { color: var(--coral); }
+  .stat-card.rate .value    { color: var(--lavender); color: #8e6cc0; }
+  .stat-card .emoji-tag {
+    display: inline-block;
+    font-size: 16px;
+    margin-right: 4px;
+  }
+
+  /* ---- chart area ---- */
+  .chart-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 28px 24px 20px;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 28px;
+  }
+  .chart-card .card-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chart-wrap {
+    position: relative;
+    height: 300px;
+  }
+
+  /* ---- progress ring ---- */
+  .progress-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .ring-wrap {
+    position: relative;
+    width: 150px; height: 150px;
+  }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg {
+    fill: none;
+    stroke: var(--sky);
+    stroke-width: 12;
+  }
+  .ring-fg {
+    fill: none;
+    stroke: url(#ringGrad);
+    stroke-width: 12;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease;
+  }
+  .ring-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .ring-label .pct {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--ocean);
+  }
+  .ring-label .sub {
+    font-size: 12px;
+    color: var(--text-light);
+    font-weight: 600;
+  }
+  .ring-info h3 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .ring-info p {
+    font-size: 14px;
+    color: var(--text-light);
+    line-height: 1.7;
+    max-width: 300px;
+  }
+  .ring-info .highlight {
+    color: var(--ocean);
+    font-weight: 700;
+  }
+
+  /* ---- table ---- */
+  .table-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .table-card .card-title {
+    font-size: 17px; font-weight: 700;
+    padding: 20px 24px 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+  }
+  th {
+    background: linear-gradient(135deg, var(--sky), var(--sky-mid));
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ocean-deep);
+    text-align: left;
+  }
+  td {
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid #f0f6fb;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fcff; }
+  td.status { font-weight: 700; }
+  td.status.good { color: #21b8a6; }
+  td.status.low  { color: var(--coral); }
+
+  /* ---- add record ---- */
+  .add-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+  }
+  .add-card .card-title {
+    font-size: 17px; font-weight: 700;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .form-group {
+    display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 120px;
+  }
+  .form-group label {
+    font-size: 13px; font-weight: 700; color: var(--text-light);
+  }
+  .form-group input, .form-group select {
+    padding: 10px 14px;
+    border: 2px solid var(--sky-mid);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s;
+    background: #fafcff;
+  }
+  .form-group input:focus, .form-group select:focus {
+    border-color: var(--ocean);
+  }
+  .btn-add {
+    padding: 10px 28px;
+    background: linear-gradient(135deg, var(--ocean), var(--mint));
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .2s, box-shadow .2s;
+    white-space: nowrap;
+  }
+  .btn-add:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(79,172,254,.3);
+  }
+  .btn-add:active { transform: translateY(0); }
+
+  /* ---- toast ---- */
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--ocean);
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 6px 24px rgba(79,172,254,.35);
+    opacity: 0;
+    transition: all .4s ease;
+    z-index: 999;
+    pointer-events: none;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @media (max-width: 600px) {
+    .app { padding: 20px 14px 40px; }
+    .header h1 { font-size: 22px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .chart-wrap { height: 240px; }
+    .progress-section { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- decorative bubbles -->
+<div class="bubbles">
+  <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+  <div class="bubble"></div><div class="bubble"></div><div class="bubble"></div>
+</div>
+
+<div class="app">
+  <!-- header -->
+  <div class="header">
+    <div class="icon">🐕</div>
+    <h1>宠物 7 天饮水量追踪</h1>
+    <p>记录毛孩子的每日喝水数据，守护健康每一天</p>
+  </div>
+
+  <!-- pet selector -->
+  <div class="pet-bar" id="petBar"></div>
+
+  <!-- stats -->
+  <div class="stats" id="statsGrid"></div>
+
+  <!-- progress ring -->
+  <div class="progress-section">
+    <div class="ring-wrap">
+      <svg viewBox="0 0 120 120" width="150" height="150">
+        <defs>
+          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#4facfe"/>
+            <stop offset="100%" stop-color="#43e8d8"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="60" cy="60" r="52"/>
+        <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52"
+                stroke-dasharray="326.73"
+                stroke-dashoffset="326.73"/>
+      </svg>
+      <div class="ring-label">
+        <span class="pct" id="ringPct">0%</span>
+        <span class="sub">达标率</span>
+      </div>
+    </div>
+    <div class="ring-info" id="ringInfo"></div>
+  </div>
+
+  <!-- chart -->
+  <div class="chart-card">
+    <div class="card-title">📊 每日饮水量趋势</div>
+    <div class="chart-wrap">
+      <canvas id="mainChart"></canvas>
+    </div>
+  </div>
+
+  <!-- table -->
+  <div class="table-card">
+    <div class="card-title">📋 详细记录</div>
+    <table>
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>星期</th>
+          <th>饮水量 (ml)</th>
+          <th>推荐量 (ml)</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- add record -->
+  <div class="add-card">
+    <div class="card-title">✏️ 添加/修改记录</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>选择日期</label>
+        <select id="daySelect"></select>
+      </div>
+      <div class="form-group">
+        <label>饮水量 (ml)</label>
+        <input type="number" id="amountInput" min="0" max="5000" placeholder="输入毫升数">
+      </div>
+      <button class="btn-add" onclick="saveRecord()">保存记录</button>
+    </div>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== DATA =====================
+const DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+
+function makeDates() {
+  const d = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const t = new Date(now);
+    t.setDate(now.getDate() - i);
+    d.push(t);
+  }
+  return d;
+}
+
+const pets = [
+  { id:'buddy',  name:'旺财', emoji:'🐶', weight:8,  recommendedPerKg:50,
+    data:[320, 280, 400, 360, 300, 440, 380] },
+  { id:'mimi',   name:'咪咪', emoji:'🐱', weight:4,  recommendedPerKg:45,
+    data:[150, 180, 140, 200, 170, 190, 160] },
+  { id:'pipi',   name:'皮皮', emoji:'🐹', weight:0.5, recommendedPerKg:60,
+    data:[22, 28, 25, 30, 20, 32, 27] },
+];
+
+let currentPet = 0;
+const dates = makeDates();
+
+// ===================== HELPERS =====================
+function fmt(d) {
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function dayOf(d) {
+  return DAYS[d.getDay() === 0 ? 6 : d.getDay()-1];
+}
+function recommended(pet) {
+  return Math.round(pet.weight * pet.recommendedPerKg);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ===================== RENDER =====================
+function renderPetBar() {
+  const bar = document.getElementById('petBar');
+  bar.innerHTML = pets.map((p,i) =>
+    `<button class="pet-btn${i===currentPet?' active':''}" onclick="switchPet(${i})">
+      <span class="emoji">${p.emoji}</span>${p.name}
+    </button>`
+  ).join('');
+}
+
+function renderStats() {
+  const p = pets[currentPet];
+  const rec = recommended(p);
+  const total = p.data.reduce((a,b)=>a+b,0);
+  const avg = Math.round(total/7);
+  const max = Math.max(...p.data);
+  const goodDays = p.data.filter(v => v >= rec).length;
+  const rate = Math.round(goodDays/7*100);
+
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = `
+    <div class="stat-card total">
+      <div class="label"><span class="emoji-tag">💧</span>总饮水量</div>
+      <div class="value">${total}<span class="unit">ml</span></div>
+    </div>
+    <div class="stat-card avg">
+      <div class="label"><span class="emoji-tag">📐</span>日均饮水</div>
+      <div class="value">${avg}<span class="unit">ml</span></div>
+    </div>
+    <div class="stat-card max">
+      <div class="label"><span class="emoji-tag">🏆</span>单日最高</div>
+      <div class="value">${max}<span class="unit">ml</span></div>
+    </div>
+    <div class="stat-card rate">
+      <div class="label"><span class="emoji-tag">✅</span>达标天数</div>
+      <div class="value">${goodDays}<span class="unit">/ 7 天</span></div>
+    </div>
+  `;
+
+  // ring
+  const pct = rate;
+  const circ = 2 * Math.PI * 52;
+  const offset = circ - (circ * pct / 100);
+  document.getElementById('ringFg').style.strokeDashoffset = offset;
+  document.getElementById('ringPct').textContent = pct + '%';
+
+  const ringInfo = document.getElementById('ringInfo');
+  const status = pct >= 80 ? '非常棒' : pct >= 50 ? '还不错' : '需要注意';
+  const color  = pct >= 80 ? '#21b8a6' : pct >= 50 ? '#e8a838' : 'var(--coral)';
+  ringInfo.innerHTML = `
+    <h3 style="color:${color}">${p.emoji} ${p.name} 的饮水健康度：<span style="color:${color}">${status}</span></h3>
+    <p>
+      体重 <span class="highlight">${p.weight}kg</span>，
+      每日建议饮水量 <span class="highlight">${rec}ml</span>。<br>
+      本周 ${goodDays} 天达标，${7-goodDays} 天不足。
+      ${pct < 80 ? '<br>💡 建议增加饮水频次，或在食物中适当加水。' : '<br>🎉 继续保持良好的饮水习惯！'}
+    </p>
+  `;
+}
+
+// ===================== CHART =====================
+let chartInstance = null;
+
+function renderChart() {
+  const p = pets[currentPet];
+  const rec = recommended(p);
+  const ctx = document.getElementById('mainChart').getContext('2d');
+
+  if (chartInstance) chartInstance.destroy();
+
+  const gradients = p.data.map((_, i) => {
+    const g = ctx.createLinearGradient(0, 0, 0, 300);
+    g.addColorStop(0, 'rgba(79,172,254,0.85)');
+    g.addColorStop(1, 'rgba(67,232,216,0.55)');
+    return g;
+  });
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dates.map(d => `${fmt(d)} ${dayOf(d)}`),
+      datasets: [
+        {
+          label: '饮水量 (ml)',
+          data: p.data,
+          backgroundColor: gradients,
+          borderRadius: 10,
+          borderSkipped: false,
+          barPercentage: .55,
+        },
+        {
+          label: '推荐量 (ml)',
+          data: Array(7).fill(rec),
+          type: 'line',
+          borderColor: 'rgba(255,138,128,0.7)',
+          borderWidth: 2.5,
+          borderDash: [8,5],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 800, easing: 'easeOutQuart' },
+      plugins: {
+        legend: {
+          labels: {
+            font: { family: 'Nunito', weight: '600', size: 13 },
+            usePointStyle: true,
+            pointStyleWidth: 14,
+            padding: 20,
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(44,62,80,0.88)',
+          titleFont: { family: 'Nunito', weight: '700' },
+          bodyFont: { family: 'Nunito', weight: '600' },
+          cornerRadius: 12,
+          padding: 12,
+          callbacks: {
+            afterBody: (items) => {
+              const v = items[0].raw;
+              const enough = v >= rec;
+              return enough ? '✅ 已达标' : '⚠️ 未达标';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { family:'Nunito', weight:'600', size:12 }, color:'#7f8c9a' }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(79,172,254,0.07)' },
+          ticks: {
+            font: { family:'Nunito', weight:'600', size:12 },
+            color: '#7f8c9a',
+            callback: v => v + 'ml'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===================== TABLE =====================
+function renderTable() {
+  const p = pets[currentPet];
+  const rec = recommended(p);
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = dates.map((d,i) => {
+    const v = p.data[i];
+    const ok = v >= rec;
+    return `<tr>
+      <td>${fmt(d)}</td>
+      <td>${dayOf(d)}</td>
+      <td>${v}</td>
+      <td>${rec}</td>
+      <td class="status ${ok?'good':'low'}">${ok?'✅ 达标':'⚠️ 不足'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===================== FORM =====================
+function renderDaySelect() {
+  const sel = document.getElementById('daySelect');
+  sel.innerHTML = dates.map((d,i) =>
+    `<option value="${i}">${fmt(d)} ${dayOf(d)}</option>`
+  ).join('');
+}
+
+function saveRecord() {
+  const idx = +document.getElementById('daySelect').value;
+  const val = +document.getElementById('amountInput').value;
+  if (!val || val <= 0) return showToast('请输入有效的饮水量');
+  if (val > 5000) return showToast('饮水量不能超过 5000ml');
+  pets[currentPet].data[idx] = val;
+  document.getElementById('amountInput').value = '';
+  renderAll();
+  showToast('记录已保存 ✨');
+}
+
+function switchPet(i) {
+  currentPet = i;
+  document.getElementById('amountInput').value = '';
+  renderAll();
+}
+
+function renderAll() {
+  renderPetBar();
+  renderStats();
+  renderChart();
+  renderTable();
+}
+
+// ===================== INIT =====================
+renderDaySelect();
+renderAll();
+</script>
+</body>
+</html>
