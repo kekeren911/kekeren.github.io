@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Scientific Calculator</title>
+<style>
+/* ========== CSS Variables / Themes ========== */
+:root {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: #ffffff;
+  --bg-display: #1a1a2e;
+  --text-primary: #16213e;
+  --text-secondary: #555;
+  --text-display: #0fca7a;
+  --text-display-expr: #a0aec0;
+  --btn-num: #ffffff;
+  --btn-num-hover: #e8e8e8;
+  --btn-op: #f8f9fa;
+  --btn-op-hover: #e2e6ea;
+  --btn-func: #e3f2fd;
+  --btn-func-hover: #bbdefb;
+  --btn-eq: #0fca7a;
+  --btn-eq-hover: #0db06d;
+  --btn-text: #16213e;
+  --border-color: #d1d5db;
+  --history-bg: #ffffff;
+  --history-item: #f8f9fa;
+  --canvas-bg: #ffffff;
+  --grid-color: #e5e7eb;
+  --axis-color: #374151;
+  --graph-color: #ef4444;
+  --shadow: 0 4px 20px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --transition: 0.3s ease;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-display: #16213e;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --text-display: #0fca7a;
+  --text-display-expr: #718096;
+  --btn-num: #2d2d44;
+  --btn-num-hover: #3d3d5c;
+  --btn-op: #252542;
+  --btn-op-hover: #35355a;
+  --btn-func: #1e3a5f;
+  --btn-func-hover: #2a5080;
+  --btn-eq: #0fca7a;
+  --btn-eq-hover: #0db06d;
+  --btn-text: #e0e0e0;
+  --border-color: #2d2d44;
+  --history-bg: #1a1a2e;
+  --history-item: #252542;
+  --canvas-bg: #1a1a2e;
+  --grid-color: #2d2d44;
+  --axis-color: #9ca3af;
+  --graph-color: #38bdf8;
+  --shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+[data-theme="retro"] {
+  --bg-primary: #2c2c2c;
+  --bg-secondary: #3c3c3c;
+  --bg-display: #1a1a1a;
+  --text-primary: #ffb000;
+  --text-secondary: #cc9500;
+  --text-display: #33ff33;
+  --text-display-expr: #33cc33;
+  --btn-num: #4a4a4a;
+  --btn-num-hover: #5a5a5a;
+  --btn-op: #555555;
+  --btn-op-hover: #666666;
+  --btn-func: #4a3a2a;
+  --btn-func-hover: #5a4a3a;
+  --btn-eq: #33aa33;
+  --btn-eq-hover: #44bb44;
+  --btn-text: #ffb000;
+  --border-color: #666;
+  --history-bg: #333;
+  --history-item: #444;
+  --canvas-bg: #111;
+  --grid-color: #333;
+  --axis-color: #ffb000;
+  --graph-color: #33ff33;
+  --shadow: 0 4px 20px rgba(0,0,0,0.5);
+  --radius: 4px;
+}
+
+/* ========== Reset & Base ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+  overflow-x: hidden;
+}
+
+/* ========== App Layout ========== */
+.app-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.app-header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.theme-switcher {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.theme-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: var(--btn-num);
+  color: var(--text-primary);
+}
+
+.theme-btn:hover, .theme-btn.active {
+  border-color: var(--btn-eq);
+  transform: scale(1.15);
+}
+
+/* ========== Calculator Panel ========== */
+.calc-panel {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  transition: background var(--transition);
+}
+
+/* Display */
+.calc-display {
+  background: var(--bg-display);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
+  overflow: hidden;
+}
+
+.calc-display .expression {
+  font-size: 1rem;
+  color: var(--text-display-expr);
+  text-align: right;
+  word-break: break-all;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.calc-display .result {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--text-display);
+  text-align: right;
+  word-break: break-all;
+  line-height: 1.2;
+  transition: color 0.2s;
+}
+
+.calc-display .result.error {
+  color: #ef4444;
+  font-size: 1.4rem;
+}
+
+.calc-display .result.preview {
+  opacity: 0.5;
+  font-size: 1.6rem;
+}
+
+/* Buttons Grid */
+.calc-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.calc-btn {
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 14px 8px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--btn-num);
+  color: var(--btn-text);
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.calc-btn:hover { background: var(--btn-num-hover); transform: translateY(-1px); }
+.calc-btn:active { transform: translateY(1px); }
+
+.calc-btn.op { background: var(--btn-op); }
+.calc-btn.op:hover { background: var(--btn-op-hover); }
+
+.calc-btn.func { background: var(--btn-func); font-size: 0.85rem; }
+.calc-btn.func:hover { background: var(--btn-func-hover); }
+
+.calc-btn.equals {
+  background: var(--btn-eq);
+  color: #fff;
+  font-size: 1.4rem;
+  grid-column: span 2;
+}
+.calc-btn.equals:hover { background: var(--btn-eq-hover); }
+
+.calc-btn.clear { background: #ef4444; color: #fff; }
+.calc-btn.clear:hover { background: #dc2626; }
+
+.calc-btn.wide { grid-column: span 2; }
+
+.calc-btn .key-hint {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 0.55rem;
+  opacity: 0.4;
+}
+
+/* ========== Side Panel ========== */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* History */
+.history-panel {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  flex: 1;
+  min-height: 200px;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  transition: background var(--transition);
+}
+
+.history-panel h3 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-clear {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+
+.history-clear:hover { background: var(--btn-op); }
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-list::-webkit-scrollbar { width: 5px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+.history-item {
+  background: var(--history-item);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.history-item:hover { background: var(--btn-func); }
+
+.history-item .hist-expr {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.history-item .hist-result {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--btn-eq);
+}
+
+.history-empty {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 30px 0;
+  font-size: 0.9rem;
+}
+
+/* ========== Graph Panel ========== */
+.graph-panel {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  transition: background var(--transition);
+}
+
+.graph-panel h3 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.graph-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.graph-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--btn-num);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.graph-input:focus { border-color: var(--btn-eq); }
+
+.graph-draw-btn {
+  padding: 10px 16px;
+  background: var(--btn-eq);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.graph-draw-btn:hover { background: var(--btn-eq-hover); }
+
+.graph-canvas-wrapper {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.graph-canvas {
+  display: block;
+  width: 100%;
+  background: var(--canvas-bg);
+  cursor: crosshair;
+}
+
+.graph-coords {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.graph-canvas-wrapper:hover .graph-coords { opacity: 1; }
+
+.graph-controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.graph-ctrl-btn {
+  flex: 1;
+  padding: 6px;
+  background: var(--btn-op);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+
+.graph-ctrl-btn:hover { background: var(--btn-op-hover); }
+
+/* ========== Mode toggle (RAD/DEG) ========== */
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--btn-num);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.mode-btn.active {
+  background: var(--btn-eq);
+  color: #fff;
+  border-color: var(--btn-eq);
+}
+
+/* ========== Toast Notifications ========== */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+  font-size: 0.9rem;
+  max-width: 320px;
+}
+
+.toast.success { border-left-color: var(--btn-eq); }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(50px); }
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 860px) {
+  .app-container {
+    grid-template-columns: 1fr;
+    max-width: 500px;
+  }
+  .calc-buttons { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .calc-btn { padding: 12px 6px; font-size: 0.9rem; }
+  .calc-display .result { font-size: 2rem; }
+  .history-panel { max-height: 300px; }
+}
+
+@media (max-width: 400px) {
+  .app-container { padding: 10px; }
+  .calc-btn { padding: 10px 4px; font-size: 0.8rem; }
+  .calc-btn.func { font-size: 0.72rem; }
+  .calc-display .result { font-size: 1.6rem; }
+  .calc-btn .key-hint { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="app-container">
+  <!-- Header -->
+  <header class="app-header">
+    <h1>Scientific Calculator</h1>
+    <div class="theme-switcher">
+      <button class="theme-btn active" data-theme="light" title="Light">&#9728;</button>
+      <button class="theme-btn" data-theme="dark" title="Dark">&#9790;</button>
+      <button class="theme-btn" data-theme="retro" title="Retro">&#9733;</button>
+    </div>
+  </header>
+
+  <!-- Calculator -->
+  <section class="calc-panel" aria-label="Calculator">
+    <!-- Mode Toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="deg">DEG</button>
+      <button class="mode-btn" data-mode="rad">RAD</button>
+    </div>
+
+    <!-- Display -->
+    <div class="calc-display">
+      <div class="expression" id="expression"></div>
+      <div class="result" id="result">0</div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="calc-buttons" id="calcButtons">
+      <!-- Row 1: Scientific -->
+      <button class="calc-btn func" data-action="func" data-value="sin(">sin<span class="key-hint">S</span></button>
+      <button class="calc-btn func" data-action="func" data-value="cos(">cos<span class="key-hint">C</span></button>
+      <button class="calc-btn func" data-action="func" data-value="tan(">tan</button>
+      <button class="calc-btn func" data-action="func" data-value="log(">log</button>
+      <button class="calc-btn func" data-action="func" data-value="ln(">ln</button>
+
+      <!-- Row 2: Scientific -->
+      <button class="calc-btn func" data-action="func" data-value="sqrt(">√<span class="key-hint">Q</span></button>
+      <button class="calc-btn func" data-action="insert" data-value="^">x^y</button>
+      <button class="calc-btn func" data-action="insert" data-value="!">n!</button>
+      <button class="calc-btn func" data-action="insert" data-value="π">π<span class="key-hint">P</span></button>
+      <button class="calc-btn func" data-action="insert" data-value="e">e</button>
+
+      <!-- Row 3: Scientific -->
+      <button class="calc-btn func" data-action="func" data-value="asin(">sin⁻¹</button>
+      <button class="calc-btn func" data-action="func" data-value="acos(">cos⁻¹</button>
+      <button class="calc-btn func" data-action="func" data-value="atan(">tan⁻¹</button>
+      <button class="calc-btn func" data-action="func" data-value="abs(">|x|</button>
+      <button class="calc-btn func" data-action="insert" data-value="%">%</button>
+
+      <!-- Row 4: Clear / Paren -->
+      <button class="calc-btn clear" data-action="clear">AC<span class="key-hint">Esc</span></button>
+      <button class="calc-btn op" data-action="backspace">&#9003;&#xFE0E;<span class="key-hint">⌫</span></button>
+      <button class="calc-btn op" data-action="insert" data-value="(">(<span class="key-hint">(</span></button>
+      <button class="calc-btn op" data-action="insert" data-value=")">)<span class="key-hint">)</span></button>
+      <button class="calc-btn op" data-action="insert" data-value="÷">÷<span class="key-hint">/</span></button>
+
+      <!-- Row 5 -->
+      <button class="calc-btn" data-action="insert" data-value="7">7</button>
+      <button class="calc-btn" data-action="insert" data-value="8">8</button>
+      <button class="calc-btn" data-action="insert" data-value="9">9</button>
+      <button class="calc-btn op" data-action="insert" data-value="×">×</button>
+      <button class="calc-btn op" data-action="insert" data-value="-">−</button>
+
+      <!-- Row 6 -->
+      <button class="calc-btn" data-action="insert" data-value="4">4</button>
+      <button class="calc-btn" data-action="insert" data-value="5">5</button>
+      <button class="calc-btn" data-action="insert" data-value="6">6</button>
+      <button class="calc-btn op" data-action="insert" data-value="+">+</button>
+      <button class="calc-btn func" data-action="insert" data-value="ANS">ANS</button>
+
+      <!-- Row 7 -->
+      <button class="calc-btn" data-action="insert" data-value="1">1</button>
+      <button class="calc-btn" data-action="insert" data-value="2">2</button>
+      <button class="calc-btn" data-action="insert" data-value="3">3</button>
+      <button class="calc-btn equals wide" data-action="evaluate">=</button>
+
+      <!-- Row 8 -->
+      <button class="calc-btn" data-action="insert" data-value=".">.</button>
+      <button class="calc-btn" data-action="insert" data-value="0">0</button>
+      <button class="calc-btn func" data-action="negate">+/−</button>
+      <button class="calc-btn clear" data-action="ce">CE</button>
+    </div>
+  </section>
+
+  <!-- Side Panel -->
+  <div class="side-panel">
+    <!-- History -->
+    <section class="history-panel" aria-label="Calculation History">
+      <h3>
+        History
+        <button class="history-clear" id="clearHistory">Clear</button>
+      </h3>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">No calculations yet</div>
+      </div>
+    </section>
+
+    <!-- Graph -->
+    <section class="graph-panel" aria-label="Function Graph">
+      <h3>Function Graph</h3>
+      <div class="graph-input-row">
+        <input type="text" class="graph-input" id="graphInput" placeholder="e.g. x^2, sin(x), x^3-2*x" value="sin(x)">
+        <button class="graph-draw-btn" id="drawGraphBtn">Draw</button>
+      </div>
+      <div class="graph-canvas-wrapper">
+        <canvas class="graph-canvas" id="graphCanvas" width="500" height="350"></canvas>
+        <div class="graph-coords" id="graphCoords">x: 0, y: 0</div>
+      </div>
+      <div class="graph-controls">
+        <button class="graph-ctrl-btn" id="zoomIn">Zoom In</button>
+        <button class="graph-ctrl-btn" id="zoomOut">Zoom Out</button>
+        <button class="graph-ctrl-btn" id="resetView">Reset</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   SHUNTING-YARD ALGORITHM + SCIENTIFIC CALCULATOR ENGINE
+   ================================================================ */
+
+const CalcEngine = (() => {
+  let angleMode = 'deg'; // 'deg' or 'rad'
+  let lastAnswer = 0;
+
+  // Operator metadata: precedence and associativity
+  const OPERATORS = {
+    '+':  { prec: 1, assoc: 'L' },
+    '-':  { prec: 1, assoc: 'L' },
+    '×':  { prec: 2, assoc: 'L' },
+    '÷':  { prec: 2, assoc: 'L' },
+    '%':  { prec: 3, assoc: 'L' },
+    '^':  { prec: 4, assoc: 'R' },
+    '!':  { prec: 5, assoc: 'L' },
+  };
+
+  const FUNCTIONS = ['sin','cos','tan','asin','acos','atan','log','ln','sqrt','abs'];
+
+  // ---------- Tokenizer ----------
+  function tokenize(input) {
+    const tokens = [];
+    let i = 0;
+    while (i < input.length) {
+      const ch = input[i];
+
+      if (/\s/.test(ch)) { i++; continue; }
+
+      // Numbers (including decimals)
+      if (/\d/.test(ch) || (ch === '.' && /\d/.test(input[i + 1]))) {
+        let num = '';
+        while (i < input.length && (/\d/.test(input[i]) || input[i] === '.')) {
+          num += input[i++];
+        }
+        tokens.push({ type: 'NUMBER', value: num });
+        continue;
+      }
+
+      // Named functions or constants
+      if (/[a-zA-Z]/.test(ch)) {
+        let name = '';
+        while (i < input.length && /[a-zA-Z]/.test(input[i])) {
+          name += input[i++];
+        }
+        name = name.toLowerCase();
+        if (name === 'pi') {
+          tokens.push({ type: 'NUMBER', value: String(Math.PI) });
+        } else if (name === 'ans') {
+          tokens.push({ type: 'NUMBER', value: String(lastAnswer) });
+        } else if (FUNCTIONS.includes(name)) {
+          tokens.push({ type: 'FUNC', value: name });
+        } else if (name === 'e' && ! FUNCTIONS.includes(name)) {
+          tokens.push({ type: 'NUMBER', value: String(Math.E) });
+        }
+        continue;
+      }
+
+      // Explicit π and e constants (unicode)
+      if (ch === 'π') { tokens.push({ type: 'NUMBER', value: String(Math.PI) }); i++; continue; }
+
+      // Operators
+      if (OPERATORS.hasOwnProperty(ch)) {
+        tokens.push({ type: 'OP', value: ch });
+        i++;
+        continue;
+      }
+
+      // Parentheses
+      if (ch === '(') { tokens.push({ type: 'LPAREN', value: '(' }); i++; continue; }
+      if (ch === ')') { tokens.push({ type: 'RPAREN', value: ')' }); i++; continue; }
+
+      // Implicit multiplication: 2( => 2×(
+      if (ch === '×' || ch === '*') { tokens.push({ type: 'OP', value: '×' }); i++; continue; }
+      if (ch === '/' || ch === '÷') { tokens.push({ type: 'OP', value: '÷' }); i++; continue; }
+
+      throw new Error(`Unknown character: '${ch}'`);
+    }
+    return tokens;
+  }
+
+  // ---------- Shunting-Yard: Infix → RPN (Postfix) ----------
+  function shuntingYard(tokens) {
+    const output = [];
+    const opStack = [];
+
+    for (const token of tokens) {
+      switch (token.type) {
+        case 'NUMBER':
+          output.push(token);
+          break;
+
+        case 'FUNC':
+          opStack.push(token);
+          break;
+
+        case 'OP':
+          const op = OPERATORS[token.value];
+          while (opStack.length > 0) {
+            const top = opStack[opStack.length - 1];
+            if (top.type === 'FUNC') {
+              output.push(opStack.pop());
+            } else if (top.type === 'OP' && top.value !== '(' &&
+              ((op.assoc === 'L' && op.prec <= OPERATORS[top.value].prec) ||
+               (op.assoc === 'R' && op.prec < OPERATORS[top.value].prec))) {
+              output.push(opStack.pop());
+            } else {
+              break;
+            }
+          }
+          opStack.push(token);
+          break;
+
+        case 'LPAREN':
+          opStack.push(token);
+          break;
+
+        case 'RPAREN':
+          while (opStack.length > 0 && opStack[opStack.length - 1].value !== '(') {
+            output.push(opStack.pop());
+          }
+          if (opStack.length === 0) throw new Error('Mismatched parentheses');
+          opStack.pop(); // discard '('
+          if (opStack.length > 0 && opStack[opStack.length - 1].type === 'FUNC') {
+            output.push(opStack.pop());
+          }
+          break;
+      }
+    }
+
+    while (opStack.length > 0) {
+      const top = opStack.pop();
+      if (top.value === '(' || top.value === ')') throw new Error('Mismatched parentheses');
+      output.push(top);
+    }
+
+    return output;
+  }
+
+  // ---------- RPN Evaluator ----------
+  function evalRPN(rpn) {
+    const stack = [];
+
+    for (const token of rpn) {
+      if (token.type === 'NUMBER') {
+        stack.push(parseFloat(token.value));
+      } else if (token.type === 'FUNC') {
+        const a = stack.pop();
+        stack.push(applyFunction(token.value, a));
+      } else if (token.type === 'OP') {
+        if (token.value === '!') {
+          const a = stack.pop();
+          stack.push(factorial(a));
+        } else {
+          const b = stack.pop();
+          const a = stack.pop();
+          stack.push(applyOperator(token.value, a, b));
+        }
+      }
+    }
+
+    if (stack.length !== 1) throw new Error('Invalid expression');
+    return stack[0];
+  }
+
+  // ---------- Apply Function ----------
+  function toRad(deg) { return deg * Math.PI / 180; }
+  function toDeg(rad) { return rad * 180 / Math.PI; }
+
+  function applyFunction(name, a) {
+    if (Number.isNaN(a)) throw new Error('Invalid input');
+    switch (name) {
+      case 'sin':  return Math.sin(angleMode === 'deg' ? toRad(a) : a);
+      case 'cos':  return Math.cos(angleMode === 'deg' ? toRad(a) : a);
+      case 'tan': {
+        const val = angleMode === 'deg' ? toRad(a) : a;
+        const cosVal = Math.cos(val);
+        if (Math.abs(cosVal) < 1e-12) throw new Error('tan(undefined) — value is undefined');
+        return Math.tan(val);
+      }
+      case 'asin': {
+        if (a < -1 || a > 1) throw new Error('asin: domain is [-1, 1]');
+        const r = Math.asin(a);
+        return angleMode === 'deg' ? toDeg(r) : r;
+      }
+      case 'acos': {
+        if (a < -1 || a > 1) throw new Error('acos: domain is [-1, 1]');
+        const r = Math.acos(a);
+        return angleMode === 'deg' ? toDeg(r) : r;
+      }
+      case 'atan': {
+        const r = Math.atan(a);
+        return angleMode === 'deg' ? toDeg(r) : r;
+      }
+      case 'log': {
+        if (a <= 0) throw new Error('log: domain is (0, ∞)');
+        return Math.log10(a);
+      }
+      case 'ln': {
+        if (a <= 0) throw new Error('ln: domain is (0, ∞)');
+        return Math.log(a);
+      }
+      case 'sqrt': {
+        if (a < 0) throw new Error('sqrt: domain is [0, ∞)');
+        return Math.sqrt(a);
+      }
+      case 'abs': return Math.abs(a);
+      default: throw new Error(`Unknown function: ${name}`);
+    }
+  }
+
+  // ---------- Apply Operator ----------
+  function applyOperator(op, a, b) {
+    switch (op) {
+      case '+': return a + b;
+      case '-': return a - b;
+      case '×': return a * b;
+      case '÷': {
+        if (b === 0) throw new Error('Division by zero');
+        return a / b;
+      }
+      case '%': return a % b;
+      case '^': {
+        const result = Math.pow(a, b);
+        if (!isFinite(result)) throw new Error('Result is not finite');
+        return result;
+      }
+      default: throw new Error(`Unknown operator: ${op}`);
+    }
+  }
+
+  // ---------- Factorial ----------
+  function factorial(n) {
+    if (n < 0) throw new Error('Factorial of negative number');
+    if (n !== Math.floor(n)) throw new Error('Factorial requires integer');
+    if (n > 170) throw new Error('Factorial result too large');
+    let result = 1;
+    for (let i = 2; i <= n; i++) result *= i;
+    return result;
+  }
+
+  // ---------- Public API ----------
+  function evaluate(input) {
+    const tokens = tokenize(input);
+    const rpn = shuntingYard(tokens);
+    const result = evalRPN(rpn);
+    lastAnswer = result;
+    return result;
+  }
+
+  function tryEvaluate(input) {
+    try {
+      const result = evaluate(input);
+      return { success: true, value: result };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  function setAngleMode(mode) {
+    angleMode = mode;
+  }
+
+  function getAngleMode() {
+    return angleMode;
+  }
+
+  // Evaluate a math expression for graphing (always radians, with x variable)
+  function evaluateGraph(expr, xVal) {
+    const substituted = expr.replace(/x/gi, `(${xVal})`);
+    return tryEvaluate(substituted);
+  }
+
+  return { evaluate, tryEvaluate, setAngleMode, getAngleMode, evaluateGraph, getLastAnswer: () => lastAnswer };
+})();
+
+
+/* ================================================================
+   UI CONTROLLER
+   ================================================================ */
+
+const UI = (() => {
+  const expressionEl = document.getElementById('expression');
+  const resultEl    = document.getElementById('result');
+  const historyList = document.getElementById('historyList');
+  const history     = [];
+
+  let currentInput = '';
+  let isNewResult  = true; // after pressing =, next digit starts fresh
+
+  function updateDisplay() {
+    expressionEl.textContent = currentInput;
+    if (!currentInput) {
+      resultEl.textContent = '0';
+      resultEl.className = 'result';
+    }
+  }
+
+  function insert(value) {
+    if (isNewResult && !['+','-','×','÷','^','%'].includes(value)) {
+      currentInput = '';
+      isNewResult = false;
+      resultEl.className = 'result';
+    }
+    isNewResult = false;
+    currentInput += value;
+    updateDisplay();
+    // Live preview
+    previewResult();
+  }
+
+  function insertFunc(value) {
+    if (isNewResult) {
+      currentInput = '';
+      isNewResult = false;
+      resultEl.className = 'result';
+    }
+    currentInput += value;
+    updateDisplay();
+  }
+
+  function clear() {
+    currentInput = '';
+    isNewResult = true;
+    resultEl.textContent = '0';
+    resultEl.className = 'result';
+    expressionEl.textContent = '';
+  }
+
+  function ce() {
+    // Clear last entry (number or function)
+    const funcPattern = /(?:sin|cos|tan|asin|acos|atan|log|ln|sqrt|abs)\($/;
+    if (funcPattern.test(currentInput)) {
+      currentInput = currentInput.replace(funcPattern, '');
+    } else {
+      currentInput = currentInput.slice(0, -1);
+    }
+    updateDisplay();
+    if (currentInput) previewResult();
+    else { resultEl.textContent = '0'; resultEl.className = 'result'; }
+  }
+
+  function backspace() { ce(); }
+
+  function negate() {
+    if (!currentInput && lastAnswer !== 0) {
+      currentInput = String(-lastAnswer);
+      isNewResult = false;
+      updateDisplay();
+      return;
+    }
+    // Try to negate last number
+    currentInput = currentInput.replace(/([\d.]+)$/, (m) => {
+      if (m.startsWith('-') || m.startsWith('(-')) return m.replace(/^-/, '').replace(/^\(-/, '');
+      return `(-${m})`;
+    });
+    updateDisplay();
+    previewResult();
+  }
+
+  function evaluate() {
+    if (!currentInput) return;
+    // Auto-close parentheses
+    let openCount = (currentInput.match(/\(/g) || []).length;
+    let closeCount = (currentInput.match(/\)/g) || []).length;
+    while (closeCount < openCount) {
+      currentInput += ')';
+      closeCount++;
+    }
+    updateDisplay();
+
+    const res = CalcEngine.tryEvaluate(currentInput);
+    if (res.success) {
+      const rounded = parseFloat(res.value.toPrecision(12));
+      const display = formatNumber(rounded);
+
+      addHistory(currentInput, display);
+      resultEl.textContent = display;
+      resultEl.className = 'result';
+      expressionEl.textContent = currentInput + ' =';
+      currentInput = String(rounded);
+      isNewResult = true;
+    } else {
+      resultEl.textContent = res.error;
+      resultEl.className = 'result error';
+      showToast(res.error);
+    }
+  }
+
+  function previewResult() {
+    // Try to evaluate current input for live preview
+    let input = currentInput;
+    let openCount = (input.match(/\(/g) || []).length;
+    let closeCount = (input.match(/\)/g) || []).length;
+    while (closeCount < openCount) {
+      input += ')';
+      closeCount++;
+    }
+    const res = CalcEngine.tryEvaluate(input);
+    if (res.success) {
+      const rounded = parseFloat(res.value.toPrecision(12));
+      resultEl.textContent = formatNumber(rounded);
+      resultEl.className = 'result preview';
+    }
+  }
+
+  function formatNumber(n) {
+    if (Number.isInteger(n) && Math.abs(n) < 1e15) return n.toLocaleString();
+    const str = String(n);
+    if (str.length > 14) return n.toExponential(8);
+    return parseFloat(n.toPrecision(10)).toString();
+  }
+
+  function addHistory(expr, result) {
+    history.unshift({ expr, result });
+    if (history.length > 50) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (history.length === 0) {
+      historyList.innerHTML = '<div class="history-empty">No calculations yet</div>';
+      return;
+    }
+    historyList.innerHTML = history.map((h, i) => `
+      <div class="history-item" data-index="${i}">
+        <div class="hist-expr">${escapeHTML(h.expr)}</div>
+        <div class="hist-result">= ${escapeHTML(h.result)}</div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function clearHistory() {
+    history.length = 0;
+    renderHistory();
+  }
+
+  function handleHistoryClick(e) {
+    const item = e.target.closest('.history-item');
+    if (!item) return;
+    const idx = parseInt(item.dataset.index);
+    currentInput = history[idx].result.replace(/,/g, '');
+    isNewResult = true;
+    resultEl.textContent = history[idx].result;
+    resultEl.className = 'result';
+    expressionEl.textContent = history[idx].expr;
+  }
+
+  return { insert, insertFunc, clear, ce, backspace, negate, evaluate, renderHistory, clearHistory, handleHistoryClick };
+})();
+
+
+/* ================================================================
+   THEME MANAGER
+   ================================================================ */
+
+document.querySelectorAll('.theme-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const theme = btn.dataset.theme;
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? '' : theme);
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // Re-draw graph with new theme colors
+    GraphManager.redraw();
+  });
+});
+
+
+/* ================================================================
+   ANGLE MODE TOGGLE
+   ================================================================ */
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    CalcEngine.setAngleMode(btn.dataset.mode);
+  });
+});
+
+
+/* ================================================================
+   BUTTON HANDLERS
+   ================================================================ */
+
+document.getElementById('calcButtons').addEventListener('click', (e) => {
+  const btn = e.target.closest('.calc-btn');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const value  = btn.dataset.value;
+  switch (action) {
+    case 'insert':    UI.insert(value); break;
+    case 'func':      UI.insertFunc(value); break;
+    case 'clear':     UI.clear(); break;
+    case 'ce':        UI.ce(); break;
+    case 'backspace': UI.backspace(); break;
+    case 'negate':    UI.negate(); break;
+    case 'evaluate':  UI.evaluate(); break;
+  }
+});
+
+document.getElementById('clearHistory').addEventListener('click', UI.clearHistory);
+document.getElementById('historyList').addEventListener('click', UI.handleHistoryClick);
+
+
+/* ================================================================
+   KEYBOARD SUPPORT
+   ================================================================ */
+
+document.addEventListener('keydown', (e) => {
+  // Skip if user is typing in graph input
+  if (e.target.id === 'graphInput') return;
+
+  const key = e.key;
+
+  // Numbers
+  if (/^[0-9]$/.test(key)) { UI.insert(key); return; }
+  if (key === '.') { UI.insert('.'); return; }
+
+  // Operators
+  if (key === '+') { UI.insert('+'); return; }
+  if (key === '-') { UI.insert('-'); return; }
+  if (key === '*') { UI.insert('×'); return; }
+  if (key === '/') { e.preventDefault(); UI.insert('÷'); return; }
+  if (key === '%') { UI.insert('%'); return; }
+  if (key === '^') { UI.insert('^'); return; }
+  if (key === '!') { UI.insert('!'); return; }
+
+  // Parentheses
+  if (key === '(') { UI.insert('('); return; }
+  if (key === ')') { UI.insert(')'); return; }
+
+  // Enter / =
+  if (key === 'Enter' || key === '=') { e.preventDefault(); UI.evaluate(); return; }
+
+  // Backspace
+  if (key === 'Backspace') { UI.backspace(); return; }
+
+  // Escape → Clear
+  if (key === 'Escape') { UI.clear(); return; }
+
+  // Delete → CE
+  if (key === 'Delete') { UI.ce(); return; }
+
+  // Scientific functions
+  if (key.toLowerCase() === 's') { UI.insertFunc('sin('); return; }
+  if (key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey) { UI.insertFunc('cos('); return; }
+  if (key.toLowerCase() === 't') { UI.insertFunc('tan('); return; }
+  if (key.toLowerCase() === 'l') { UI.insertFunc('log('); return; }
+  if (key.toLowerCase() === 'n') { UI.insertFunc('ln('); return; }
+  if (key.toLowerCase() === 'q') { UI.insertFunc('sqrt('); return; }
+  if (key.toLowerCase() === 'p') { UI.insert('π'); return; }
+});
+
+
+/* ================================================================
+   TOAST NOTIFICATIONS
+   ================================================================ */
+
+function showToast(message, type = 'error') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+
+/* ================================================================
+   GRAPH MANAGER — HTML Canvas
+   ================================================================ */
+
+const GraphManager = (() => {
+  const canvas  = document.getElementById('graphCanvas');
+  const ctx     = canvas.getContext('2d');
+  const input   = document.getElementById('graphInput');
+  const coordsEl = document.getElementById('graphCoords');
+
+  // View state
+  let viewX = -10, viewX2 = 10;
+  let viewY = -7, viewY2 = 7;
+  let currentExpr = 'sin(x)';
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let dragViewStart = { x1: 0, x2: 0, y1: 0, y2: 0 };
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = 350 * dpr;
+    canvas.style.height = '350px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function getThemeColor(varName) {
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function draw() {
+    const w = canvas.width / (window.devicePixelRatio || 1);
+    const h = canvas.height / (window.devicePixelRatio || 1);
+    const bgColor     = getThemeColor('--canvas-bg');
+    const gridColor   = getThemeColor('--grid-color');
+    const axisColor   = getThemeColor('--axis-color');
+    const graphColor  = getThemeColor('--graph-color');
+    const textColor   = getThemeColor('--text-secondary');
+
+    // Background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, w, h);
+
+    const xRange = viewX2 - viewX;
+    const yRange = viewY2 - viewY;
+
+    function toCanvasX(x) { return (x - viewX) / xRange * w; }
+    function toCanvasY(y) { return h - (y - viewY) / yRange * h; }
+    function toMathX(cx) { return viewX + cx / w * xRange; }
+    function toMathY(cy) { return viewY + (h - cy) / h * yRange; }
+
+    // Grid lines
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 0.5;
+    const gridStep = calcGridStep(xRange);
+    ctx.beginPath();
+    for (let x = Math.ceil(viewX / gridStep) * gridStep; x <= viewX2; x += gridStep) {
+      const cx = toCanvasX(x);
+      ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    }
+    for (let y = Math.ceil(viewY / gridStep) * gridStep; y <= viewY2; y += gridStep) {
+      const cy = toCanvasY(y);
+      ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    }
+    ctx.stroke();
+
+    // Axes
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    // X axis
+    if (viewY <= 0 && viewY2 >= 0) {
+      const cy = toCanvasY(0);
+      ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    }
+    // Y axis
+    if (viewX <= 0 && viewX2 >= 0) {
+      const cx = toCanvasX(0);
+      ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    }
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = textColor;
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'center';
+    if (viewY <= 0 && viewY2 >= 0) {
+      for (let x = Math.ceil(viewX / gridStep) * gridStep; x <= viewX2; x += gridStep) {
+        if (Math.abs(x) < gridStep * 0.1) continue;
+        const cx = toCanvasX(x);
+        const cy = Math.min(Math.max(toCanvasY(0) + 14, 14), h - 4);
+        ctx.fillText(formatAxisLabel(x), cx, cy);
+      }
+    }
+    ctx.textAlign = 'right';
+    if (viewX <= 0 && viewX2 >= 0) {
+      for (let y = Math.ceil(viewY / gridStep) * gridStep; y <= viewY2; y += gridStep) {
+        if (Math.abs(y) < gridStep * 0.1) continue;
+        const cy = toCanvasY(y);
+        const cx = Math.min(Math.max(toCanvasX(0) - 6, 30), w - 4);
+        ctx.fillText(formatAxisLabel(y), cx, cy + 4);
+      }
+    }
+
+    // Plot function
+    if (currentExpr) {
+      ctx.strokeStyle = graphColor;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      let penDown = false;
+      const step = xRange / w * 0.5; // sub-pixel resolution
+
+      for (let x = viewX; x <= viewX2; x += step) {
+        // Substitute x into expression
+        let expr = currentExpr.replace(/x/gi, `(${x})`);
+        const res = CalcEngine.tryEvaluate(expr);
+        if (res.success && isFinite(res.value)) {
+          const cy = toCanvasY(res.value);
+          if (cy >= -h && cy <= 2 * h) {
+            if (!penDown) { ctx.moveTo(toCanvasX(x), cy); penDown = true; }
+            else ctx.lineTo(toCanvasX(x), cy);
+          } else {
+            penDown = false;
+          }
+        } else {
+          penDown = false;
+        }
+      }
+      ctx.stroke();
+    }
+  }
+
+  function calcGridStep(range) {
+    const raw = range / 10;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    if (norm <= 1) return mag;
+    if (norm <= 2) return 2 * mag;
+    if (norm <= 5) return 5 * mag;
+    return 10 * mag;
+  }
+
+  function formatAxisLabel(n) {
+    if (Math.abs(n) >= 1000 || (Math.abs(n) < 0.01 && n !== 0)) return n.toExponential(1);
+    return parseFloat(n.toPrecision(4)).toString();
+  }
+
+  function drawGraph() {
+    currentExpr = input.value.trim();
+    if (!currentExpr) return;
+    draw();
+  }
+
+  function zoom(factor) {
+    const cx = (viewX + viewX2) / 2;
+    const cy = (viewY + viewY2) / 2;
+    const xRange = (viewX2 - viewX) * factor;
+    const yRange = (viewY2 - viewY) * factor;
+    viewX = cx - xRange / 2;
+    viewX2 = cx + xRange / 2;
+    viewY = cy - yRange / 2;
+    viewY2 = cy + yRange / 2;
+    draw();
+  }
+
+  function reset() {
+    viewX = -10; viewX2 = 10;
+    viewY = -7;  viewY2 = 7;
+    draw();
+  }
+
+  // Mouse interactions
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+    const mx = viewX + cx / w * (viewX2 - viewX);
+    const my = viewY + (h - cy) / h * (viewY2 - viewY);
+    coordsEl.textContent = `x: ${mx.toFixed(3)}, y: ${my.toFixed(3)}`;
+
+    if (isDragging) {
+      const dx = (e.clientX - dragStart.x) / rect.width * (dragViewStart.x2 - dragViewStart.x1);
+      const dy = (e.clientY - dragStart.y) / rect.height * (dragViewStart.y2 - dragViewStart.y1);
+      viewX  = dragViewStart.x1 - dx;
+      viewX2 = dragViewStart.x2 - dx;
+      viewY  = dragViewStart.y1 + dy;
+      viewY2 = dragViewStart.y2 + dy;
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragStart = { x: e.clientX, y: e.clientY };
+    dragViewStart = { x1: viewX, x2: viewX2, y1: viewY, y2: viewY2 };
+    canvas.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    canvas.style.cursor = 'crosshair';
+  });
+
+  // Scroll to zoom
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.1 : 0.9;
+    zoom(factor);
+  }, { passive: false });
+
+  // Touch support
+  let lastTouchDist = 0;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      isDragging = true;
+      dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      dragViewStart = { x1: viewX, x2: viewX2, y1: viewY, y2: viewY2 };
+    } else if (e.touches.length === 2) {
+      isDragging = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1 && isDragging) {
+      const rect = canvas.getBoundingClientRect();
+      const dx = (e.touches[0].clientX - dragStart.x) / rect.width * (dragViewStart.x2 - dragViewStart.x1);
+      const dy = (e.touches[0].clientY - dragStart.y) / rect.height * (dragViewStart.y2 - dragViewStart.y1);
+      viewX  = dragViewStart.x1 - dx;
+      viewX2 = dragViewStart.x2 - dx;
+      viewY  = dragViewStart.y1 + dy;
+      viewY2 = dragViewStart.y2 + dy;
+      draw();
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (lastTouchDist > 0) {
+        zoom(lastTouchDist / dist);
+      }
+      lastTouchDist = dist;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => {
+    isDragging = false;
+    lastTouchDist = 0;
+  });
+
+  // Buttons
+  document.getElementById('drawGraphBtn').addEventListener('click', drawGraph);
+  document.getElementById('zoomIn').addEventListener('click', () => zoom(0.7));
+  document.getElementById('zoomOut').addEventListener('click', () => zoom(1.4));
+  document.getElementById('resetView').addEventListener('click', reset);
+
+  // Enter to draw graph
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') drawGraph();
+  });
+
+  window.addEventListener('resize', resize);
+
+  // Init
+  resize();
+
+  return { redraw: draw, resize };
+})();
+
+
+/* ================================================================
+   INIT
+   ================================================================ */
+UI.renderHistory();
+</script>
+</body>
+</html>
