@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宠物饮水量追踪</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f0faf5;
+    --card: #ffffff;
+    --accent: #38bdf8;
+    --accent-soft: #bae6fd;
+    --green: #4ade80;
+    --green-soft: #bbf7d0;
+    --pink: #f9a8d4;
+    --pink-soft: #fce7f3;
+    --orange: #fdba74;
+    --orange-soft: #ffedd5;
+    --text: #1e293b;
+    --text-light: #64748b;
+    --border: #e2e8f0;
+    --shadow: 0 4px 24px rgba(56,189,248,0.10);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(56,189,248,0.08) 0%, transparent 50%),
+      radial-gradient(circle at 90% 80%, rgba(74,222,128,0.08) 0%, transparent 50%);
+  }
+
+  .glass-card {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(56,189,248,0.15);
+  }
+
+  .wave-bg {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+    border-radius: 24px;
+    color: white;
+    padding: 32px;
+  }
+  .wave-bg::before {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: -10%;
+    width: 120%;
+    height: 60px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 60'%3E%3Cpath d='M0,30 C200,60 400,0 600,30 C800,60 1000,0 1200,30 L1200,60 L0,60Z' fill='rgba(255,255,255,0.1)'/%3E%3C/svg%3E") repeat-x;
+    animation: wave 4s ease-in-out infinite;
+  }
+  @keyframes wave {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-20px); }
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .day-bar {
+    transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 8px 8px 4px 4px;
+  }
+
+  .day-bar:hover {
+    filter: brightness(1.1);
+    cursor: pointer;
+  }
+
+  .tooltip-custom {
+    position: absolute;
+    background: white;
+    border-radius: 12px;
+    padding: 8px 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    font-size: 0.8rem;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 50;
+    white-space: nowrap;
+  }
+  .tooltip-custom.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .progress-ring {
+    transform: rotate(-90deg);
+  }
+  .progress-ring circle {
+    transition: stroke-dashoffset 0.8s ease;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 24px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(56,189,248,0.35);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  input[type="number"], select {
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    background: white;
+  }
+  input[type="number"]:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .history-item {
+    transition: background 0.2s;
+    border-radius: 12px;
+    padding: 12px 16px;
+  }
+  .history-item:hover {
+    background: #f8fafc;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="app" class="max-w-5xl mx-auto px-4 py-8">
+
+  <!-- Header -->
+  <header class="text-center mb-8 fade-in">
+    <div class="inline-flex items-center gap-3 mb-3">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="18" fill="#bae6fd"/>
+        <path d="M12 26c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="16" cy="15" r="2" fill="#0ea5e9"/>
+        <circle cx="24" cy="15" r="2" fill="#0ea5e9"/>
+        <path d="M8 12l2 3-2 3" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        <path d="M32 12l-2 3 2 3" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      </svg>
+      <h1 class="text-3xl font-extrabold tracking-tight" style="background:linear-gradient(135deg,#0ea5e9,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+        宠物饮水量追踪
+      </h1>
+    </div>
+    <p class="text-sm" style="color:var(--text-light)">记录毛孩子的每日饮水量，守护它的健康</p>
+  </header>
+
+  <!-- Pet Info Banner -->
+  <div class="wave-bg mb-6 fade-in" style="animation-delay:0.1s">
+    <div class="relative z-10 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <div id="pet-avatar" class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-3xl select-none">
+          🐱
+        </div>
+        <div>
+          <h2 class="text-xl font-bold" id="pet-name">咪咪</h2>
+          <p class="text-sm opacity-80" id="pet-info">英短蓝猫 · 3岁 · 4.5kg</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="health-badge" class="status-badge bg-white/20 text-white"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="glass-card p-5 text-center fade-in" style="animation-delay:0.15s">
+      <div class="w-10 h-10 mx-auto mb-2 rounded-xl flex items-center justify-center" style="background:var(--accent-soft)">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0L12 2.69z" fill="#38bdf8"/></svg>
+      </div>
+      <div class="stat-number" style="color:var(--accent)" id="stat-total">0</div>
+      <div class="text-xs mt-1" style="color:var(--text-light)">7天总量 (ml)</div>
+    </div>
+    <div class="glass-card p-5 text-center fade-in" style="animation-delay:0.2s">
+      <div class="w-10 h-10 mx-auto mb-2 rounded-xl flex items-center justify-center" style="background:var(--green-soft)">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M3 12h4l3-9 4 18 3-9h4" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="stat-number" style="color:#22c55e" id="stat-avg">0</div>
+      <div class="text-xs mt-1" style="color:var(--text-light)">日均 (ml)</div>
+    </div>
+    <div class="glass-card p-5 text-center fade-in" style="animation-delay:0.25s">
+      <div class="w-10 h-10 mx-auto mb-2 rounded-xl flex items-center justify-center" style="background:var(--pink-soft)">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 8v8m-4-4h8" stroke="#f472b6" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="stat-number" style="color:#ec4899" id="stat-max">0</div>
+      <div class="text-xs mt-1" style="color:var(--text-light)">单日最高 (ml)</div>
+    </div>
+    <div class="glass-card p-5 text-center fade-in" style="animation-delay:0.3s">
+      <div class="w-10 h-10 mx-auto mb-2 rounded-xl flex items-center justify-center" style="background:var(--orange-soft)">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#f97316" stroke-width="2.5"/><path d="M12 7v5l3 3" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="stat-number" style="color:#f97316" id="stat-streak">0</div>
+      <div class="text-xs mt-1" style="color:var(--text-light)">达标天数</div>
+    </div>
+  </div>
+
+  <!-- Goal Progress + Chart -->
+  <div class="grid md:grid-cols-3 gap-6 mb-6">
+    <!-- Goal Progress -->
+    <div class="glass-card p-6 flex flex-col items-center justify-center fade-in" style="animation-delay:0.35s">
+      <h3 class="text-sm font-bold mb-4" style="color:var(--text-light)">今日饮水进度</h3>
+      <div style="position:relative;width:140px;height:140px">
+        <svg class="progress-ring" width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="58" stroke="#e2e8f0" stroke-width="10" fill="none"/>
+          <circle id="progress-circle" cx="70" cy="70" r="58" stroke="url(#grad)" stroke-width="10" fill="none"
+                  stroke-linecap="round" stroke-dasharray="364.4" stroke-dashoffset="364.4"/>
+          <defs>
+            <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#818cf8"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(0deg)">
+          <span id="progress-pct" class="text-2xl font-extrabold" style="color:var(--accent)">0%</span>
+          <span class="text-xs" style="color:var(--text-light)" id="progress-ml">0 / 250 ml</span>
+        </div>
+      </div>
+      <div class="mt-4 text-center">
+        <p class="text-xs" style="color:var(--text-light)">每日推荐量：<strong id="daily-goal-display">250</strong> ml</p>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="glass-card p-6 md:col-span-2 fade-in" style="animation-delay:0.4s">
+      <h3 class="text-sm font-bold mb-4" style="color:var(--text-light)">7天饮水趋势</h3>
+      <div style="position:relative;height:240px">
+        <canvas id="waterChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Record + History -->
+  <div class="grid md:grid-cols-2 gap-6 mb-6">
+    <!-- Add Record -->
+    <div class="glass-card p-6 fade-in" style="animation-delay:0.45s">
+      <h3 class="text-sm font-bold mb-4" style="color:var(--text-light)">记录饮水量</h3>
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="text-xs font-semibold block mb-1" style="color:var(--text-light)">选择日期</label>
+          <select id="input-day" class="w-full"></select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold block mb-1" style="color:var(--text-light)">饮水量 (ml)</label>
+          <input type="number" id="input-amount" class="w-full" min="0" max="2000" step="10" placeholder="例如：250">
+        </div>
+        <button class="btn-primary w-full mt-1" onclick="addRecord()">
+          记录
+        </button>
+        <div class="flex gap-2 mt-1">
+          <button class="btn-primary flex-1" style="background:linear-gradient(135deg,#f9a8d4,#f472b6);padding:8px 12px;font-size:0.8rem" onclick="quickAdd(50)">+50ml</button>
+          <button class="btn-primary flex-1" style="background:linear-gradient(135deg,#fdba74,#f97316);padding:8px 12px;font-size:0.8rem" onclick="quickAdd(100)">+100ml</button>
+          <button class="btn-primary flex-1" style="background:linear-gradient(135deg,#bbf7d0,#4ade80);padding:8px 12px;font-size:0.8rem;color:#166534" onclick="quickAdd(200)">+200ml</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="glass-card p-6 fade-in" style="animation-delay:0.5s">
+      <h3 class="text-sm font-bold mb-4" style="color:var(--text-light)">本周记录</h3>
+      <div id="history-list" class="flex flex-col gap-1 max-h-64 overflow-y-auto" style="scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;"></div>
+    </div>
+  </div>
+
+  <!-- Weekly Bar Visualization -->
+  <div class="glass-card p-6 mb-6 fade-in" style="animation-delay:0.55s">
+    <h3 class="text-sm font-bold mb-5" style="color:var(--text-light)">每日饮水柱状图</h3>
+    <div id="bar-chart" class="flex items-end justify-around gap-2" style="height:180px;padding-bottom:28px;position:relative;">
+      <div class="tooltip-custom" id="bar-tooltip"></div>
+    </div>
+  </div>
+
+  <!-- Tips -->
+  <div class="glass-card p-6 fade-in" style="animation-delay:0.6s">
+    <h3 class="text-sm font-bold mb-3" style="color:var(--text-light)">饮水小贴士</h3>
+    <div class="grid sm:grid-cols-3 gap-3">
+      <div class="flex items-start gap-3 p-3 rounded-2xl" style="background:var(--accent-soft)">
+        <span class="text-xl mt-0.5">💧</span>
+        <div>
+          <p class="text-xs font-bold" style="color:#0c4a6e">猫猫每公斤体重</p>
+          <p class="text-xs" style="color:#0369a1">每天需 40-60ml 水</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-3 p-3 rounded-2xl" style="background:var(--green-soft)">
+        <span class="text-xl mt-0.5">🥣</span>
+        <div>
+          <p class="text-xs font-bold" style="color:#14532d">使用流动饮水机</p>
+          <p class="text-xs" style="color:#166534">能增加饮水量 30%</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-3 p-3 rounded-2xl" style="background:var(--orange-soft)">
+        <span class="text-xl mt-0.5">📊</span>
+        <div>
+          <p class="text-xs font-bold" style="color:#7c2d12">饮水量骤降？</p>
+          <p class="text-xs" style="color:#9a3412">可能预示健康问题</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-center text-xs mt-8 mb-4" style="color:var(--text-light)">用爱守护每一个小生命</p>
+</div>
+
+<script>
+// ─── Data ───
+const STORAGE_KEY = 'pet-water-data';
+const DAILY_GOAL_KEY = 'pet-water-goal';
+
+const dayLabels = (() => {
+  const names = ['周日','周一','周二','周三','周四','周五','周六'];
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push({
+      key: d.toISOString().slice(0, 10),
+      label: names[d.getDay()],
+      short: `${d.getMonth()+1}/${d.getDate()}`,
+      date: d
+    });
+  }
+  return days;
+})();
+
+function loadGoal() {
+  return parseInt(localStorage.getItem(DAILY_GOAL_KEY)) || 250;
+}
+
+function loadRecords() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); } catch(e) { /* fall through */ }
+  }
+  // default sample data
+  const defaults = [210, 260, 180, 300, 240, 195, 0];
+  const records = {};
+  dayLabels.forEach((d, i) => { records[d.key] = defaults[i]; });
+  return records;
+}
+
+function saveRecords(records) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+let records = loadRecords();
+let dailyGoal = loadGoal();
+let chart = null;
+
+// ─── Render ───
+function render() {
+  const values = dayLabels.map(d => records[d.key] || 0);
+  const today = dayLabels[6].key;
+  const todayVal = records[today] || 0;
+
+  // Stats
+  const total = values.reduce((a,b) => a+b, 0);
+  const avg = Math.round(total / 7);
+  const max = Math.max(...values);
+  const streak = values.filter(v => v >= dailyGoal).length;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-avg').textContent = avg;
+  document.getElementById('stat-max').textContent = max;
+  document.getElementById('stat-streak').textContent = streak;
+
+  // Health badge
+  const badge = document.getElementById('health-badge');
+  if (avg >= dailyGoal) {
+    badge.innerHTML = '✨ 饮水充足';
+    badge.style.background = 'rgba(74,222,128,0.3)';
+  } else if (avg >= dailyGoal * 0.7) {
+    badge.innerHTML = '💛 还需加油';
+    badge.style.background = 'rgba(251,191,36,0.3)';
+  } else {
+    badge.innerHTML = '⚠️ 注意补水';
+    badge.style.background = 'rgba(249,115,22,0.3)';
+  }
+
+  // Progress ring
+  const circumference = 2 * Math.PI * 58;
+  const pct = Math.min(todayVal / dailyGoal, 1);
+  const offset = circumference - pct * circumference;
+  document.getElementById('progress-circle').style.strokeDashoffset = offset;
+  document.getElementById('progress-pct').textContent = Math.round(pct * 100) + '%';
+  document.getElementById('progress-ml').textContent = `${todayVal} / ${dailyGoal} ml`;
+  document.getElementById('daily-goal-display').textContent = dailyGoal;
+
+  // Day selector
+  const sel = document.getElementById('input-day');
+  sel.innerHTML = '';
+  dayLabels.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.key;
+    opt.textContent = `${d.label} (${d.short})`;
+    sel.appendChild(opt);
+  });
+
+  // History
+  const hist = document.getElementById('history-list');
+  hist.innerHTML = '';
+  dayLabels.slice().reverse().forEach(d => {
+    const val = records[d.key] || 0;
+    const pctDay = Math.min(val / dailyGoal, 1);
+    const isToday = d.key === today;
+    const statusColor = val >= dailyGoal ? '#4ade80' : val > 0 ? '#fbbf24' : '#e2e8f0';
+    const statusText = val >= dailyGoal ? '达标' : val > 0 ? '未达标' : '未记录';
+
+    const item = document.createElement('div');
+    item.className = 'history-item flex items-center gap-3';
+    item.innerHTML = `
+      <div class="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold" style="background:${val >= dailyGoal ? 'var(--green-soft)' : val > 0 ? 'var(--orange-soft)' : '#f1f5f9'};color:${val >= dailyGoal ? '#166534' : val > 0 ? '#9a3412' : '#94a3b8'}">
+        ${d.label.slice(1)}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold">${d.short}</span>
+          ${isToday ? '<span class="text-xs px-2 py-0.5 rounded-full font-bold" style="background:var(--accent-soft);color:#0c4a6e">今天</span>' : ''}
+        </div>
+        <div class="flex items-center gap-2 mt-0.5">
+          <div class="flex-1 h-1.5 rounded-full" style="background:#e2e8f0;max-width:120px">
+            <div class="h-full rounded-full" style="width:${Math.round(pctDay*100)}%;background:${statusColor};transition:width 0.5s"></div>
+          </div>
+          <span class="text-xs" style="color:${statusColor}" id="hist-status-${d.key}">${statusText}</span>
+        </div>
+      </div>
+      <span class="text-sm font-bold" style="color:var(--text)">${val > 0 ? val + ' ml' : '-'}</span>
+    `;
+    hist.appendChild(item);
+  });
+
+  // Bar chart
+  renderBarChart(values);
+
+  // Line chart
+  renderLineChart(values);
+}
+
+function renderBarChart(values) {
+  const container = document.getElementById('bar-chart');
+  // Remove old bars
+  container.querySelectorAll('.bar-col').forEach(el => el.remove());
+
+  const maxVal = Math.max(...values, dailyGoal, 1);
+
+  dayLabels.forEach((d, i) => {
+    const val = values[i];
+    const heightPct = Math.max((val / maxVal) * 100, 3);
+    const color = val >= dailyGoal
+      ? 'linear-gradient(180deg, #38bdf8, #818cf8)'
+      : val > 0
+        ? 'linear-gradient(180deg, #bae6fd, #bae6fd)'
+        : '#e2e8f0';
+
+    const col = document.createElement('div');
+    col.className = 'bar-col flex flex-col items-center';
+    col.style.flex = '1';
+    col.style.height = '100%';
+    col.style.display = 'flex';
+    col.style.flexDirection = 'column';
+    col.style.justifyContent = 'flex-end';
+    col.style.alignItems = 'center';
+    col.style.position = 'relative';
+
+    col.innerHTML = `
+      <div class="text-xs font-bold mb-1" style="color:${val >= dailyGoal ? 'var(--accent)' : val > 0 ? '#94a3b8' : '#cbd5e1'}">${val > 0 ? val : ''}</div>
+      <div class="day-bar" style="width:70%;max-width:48px;height:0%;background:${color}" data-val="${val}" data-day="${d.label} (${d.short})"></div>
+      <div class="mt-2 text-xs font-semibold" style="color:var(--text-light)">${d.label.slice(1)}</div>
+    `;
+
+    container.appendChild(col);
+
+    // Animate
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        col.querySelector('.day-bar').style.height = heightPct + '%';
+      }, i * 60);
+    });
+  });
+
+  // Goal line
+  const goalPct = (dailyGoal / maxVal) * 100;
+  const goalLine = document.createElement('div');
+  goalLine.style.cssText = `
+    position:absolute; bottom:${28 + goalPct * (1 - 28/180)}%; left:0; right:0;
+    border-top: 2px dashed #f97316; z-index: 1; pointer-events: none;
+  `;
+  goalLine.title = `每日目标: ${dailyGoal}ml`;
+  container.appendChild(goalLine);
+}
+
+function renderLineChart(values) {
+  const ctx = document.getElementById('waterChart').getContext('2d');
+
+  if (chart) chart.destroy();
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+  gradient.addColorStop(0, 'rgba(56,189,248,0.25)');
+  gradient.addColorStop(1, 'rgba(56,189,248,0.02)');
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dayLabels.map(d => d.short),
+      datasets: [
+        {
+          label: '饮水量 (ml)',
+          data: values,
+          borderColor: '#38bdf8',
+          backgroundColor: gradient,
+          borderWidth: 3,
+          pointBackgroundColor: values.map(v => v >= dailyGoal ? '#38bdf8' : '#bae6fd'),
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          fill: true,
+          tension: 0.4,
+        },
+        {
+          label: '每日目标',
+          data: Array(7).fill(dailyGoal),
+          borderColor: '#f97316',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: {
+            usePointStyle: true,
+            pointStyle: 'circle',
+            font: { family: 'Nunito', size: 11 },
+            padding: 16,
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          titleFont: { family: 'Nunito', weight: '700' },
+          bodyFont: { family: 'Nunito' },
+          titleColor: '#1e293b',
+          bodyColor: '#64748b',
+          borderColor: '#e2e8f0',
+          borderWidth: 1,
+          cornerRadius: 12,
+          padding: 12,
+          displayColors: false,
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + ' ml'
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Nunito', weight: '600', size: 11 }, color: '#94a3b8' }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(226,232,240,0.6)', drawBorder: false },
+          ticks: {
+            font: { family: 'Nunito', size: 11 },
+            color: '#94a3b8',
+            callback: v => v + 'ml'
+          }
+        }
+      },
+      interaction: { intersect: false, mode: 'index' }
+    }
+  });
+}
+
+// ─── Actions ───
+function addRecord() {
+  const day = document.getElementById('input-day').value;
+  const amount = parseInt(document.getElementById('input-amount').value);
+
+  if (isNaN(amount) || amount < 0) {
+    showToast('请输入有效的饮水量');
+    return;
+  }
+  if (amount > 2000) {
+    showToast('饮水量似乎不太对，请检查');
+    return;
+  }
+
+  records[day] = amount;
+  saveRecords(records);
+  document.getElementById('input-amount').value = '';
+  render();
+  showToast('记录成功！');
+}
+
+function quickAdd(ml) {
+  const day = document.getElementById('input-day').value;
+  records[day] = (records[day] || 0) + ml;
+  saveRecords(records);
+  render();
+  showToast(`+${ml}ml 已记录`);
+}
+
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = `
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: rgba(30,41,59,0.9); color: white; padding: 10px 24px; border-radius: 12px;
+    font-family: 'Nunito'; font-size: 0.85rem; font-weight: 600; z-index: 999;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    backdrop-filter: blur(8px);
+  `;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(20px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+}
+
+// ─── Init ───
+render();
+</script>
+
+</body>
+</html>
